@@ -2,7 +2,7 @@
 // This module contains the core business logic for handling HTTP requests
 
 use lambda_http::{Error, Request, Response, Body};
-use crate::response::{create_html_response, create_error_response};
+use crate::response::{create_html_response, create_generic_error_response, ApplicationError};
 use crate::security::{sanitize_path, validate_request_size, validate_http_method};
 
 // Import logging functionality for structured request logging
@@ -275,10 +275,12 @@ pub async fn function_handler(request: Request) -> Result<Response<Body>, Error>
     // defined by server. The server is closing the connection or returning a
     // Retry-After header field indicating when to try again.
     if let Err(security_error) = validate_request_size(&request) {
-        let response = create_error_response(
-            security_error.to_http_status_code(),
-            &security_error.to_user_message()
-        )?;
+        let app_error = ApplicationError::Security {
+            security_error,
+            context: "request size validation".to_string(),
+        };
+        
+        let response = create_generic_error_response(app_error)?;
         
         // Log error response with processing time (Task 26 - Requirements 2.4)
         let processing_time = start_time.elapsed();
@@ -299,12 +301,14 @@ pub async fn function_handler(request: Request) -> Result<Response<Body>, Error>
     // but the target resource doesn't support this method. For a static web server,
     // only GET requests make sense since we're serving read-only content.
     if let Err(security_error) = validate_http_method(request.method().as_str()) {
+        let app_error = ApplicationError::Security {
+            security_error,
+            context: "HTTP method validation".to_string(),
+        };
+        
         // Return HTTP 405 Method Not Allowed for any non-GET request
-        // Use create_error_response to ensure all security headers are included
-        let response = create_error_response(
-            security_error.to_http_status_code(),
-            &security_error.to_user_message()
-        )?;
+        // Use create_generic_error_response to ensure all security headers are included
+        let response = create_generic_error_response(app_error)?;
         
         // Log error response with processing time (Task 26 - Requirements 2.4)
         let processing_time = start_time.elapsed();
@@ -346,12 +350,14 @@ pub async fn function_handler(request: Request) -> Result<Response<Body>, Error>
                   security_error.to_detailed_message(),
                   request.uri().path());
             
+            let app_error = ApplicationError::Security {
+                security_error,
+                context: "path sanitization".to_string(),
+            };
+            
             // Return HTTP 400 Bad Request for malicious paths
             // We provide a generic error message to avoid information disclosure
-            let response = create_error_response(
-                security_error.to_http_status_code(),
-                &security_error.to_user_message()
-            )?;
+            let response = create_generic_error_response(app_error)?;
             
             // Log error response with processing time (Task 26 - Requirements 2.4)
             let processing_time = start_time.elapsed();

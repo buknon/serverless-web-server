@@ -141,7 +141,7 @@ This implementation plan breaks down the static web Lambda project into small, d
   - Add conversion to HTTP status codes
   - _Requirements: 5.4, 3.4_
 
-- [ ] 29. Implement generic error responses
+- [x] 29. Implement generic error responses
   - Create function that returns generic error messages to users
   - Ensure no sensitive information leaks in error responses
   - _Requirements: 5.4, 3.4_

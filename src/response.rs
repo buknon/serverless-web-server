@@ -2,6 +2,8 @@
 // This module handles building proper HTTP responses with security headers
 
 use lambda_http::{Error, Response, Body};
+use log;
+use chrono;
 
 /// Static HTML content served by our Lambda function
 /// 
@@ -595,11 +597,385 @@ pub fn create_html_response() -> Result<Response<Body>, Error> {
     Ok(response)
 }
 
+/// Application error types that can occur during request processing
+/// 
+/// This enum represents all possible error conditions that can occur in our
+/// Lambda function. Each error type maps to an appropriate HTTP status code
+/// and generic user message to prevent information disclosure.
+/// 
+/// ## Security Principles:
+/// 
+/// 1. **Generic User Messages**: All error messages shown to users are generic
+///    and don't reveal internal implementation details or sensitive information.
+/// 
+/// 2. **Detailed Logging**: Full error details are logged internally for
+///    debugging and security monitoring, but never exposed to users.
+/// 
+/// 3. **Consistent HTTP Status Codes**: Each error type maps to the most
+///    appropriate HTTP status code according to RFC standards.
+/// 
+/// 4. **Information Disclosure Prevention**: Error responses don't reveal
+///    system internals, file paths, database schemas, or other sensitive data.
+#[derive(Debug, Clone)]
+pub enum ApplicationError {
+    /// Security-related errors (malicious requests, validation failures)
+    /// 
+    /// These errors occur when security validation fails, such as:
+    /// - Invalid HTTP methods
+    /// - Malicious request paths
+    /// - Oversized requests
+    /// - Suspicious headers or content
+    /// 
+    /// **User Message**: Generic security error message
+    /// **HTTP Status**: Varies based on specific security violation
+    /// **Logging**: Full security violation details for monitoring
+    Security {
+        /// The underlying security error with full details
+        security_error: crate::security::SecurityError,
+        /// Additional context about when/where the error occurred
+        context: String,
+    },
+
+    /// Internal server errors (unexpected failures, system errors)
+    /// 
+    /// These errors occur when something goes wrong internally that's not
+    /// the user's fault, such as:
+    /// - Memory allocation failures
+    /// - Unexpected panics or crashes
+    /// - AWS Lambda runtime errors
+    /// - Configuration errors
+    /// 
+    /// **User Message**: Generic internal server error message
+    /// **HTTP Status**: 500 Internal Server Error
+    /// **Logging**: Full error details and stack traces for debugging
+    InternalError {
+        /// Description of what went wrong internally
+        details: String,
+        /// Optional underlying error cause
+        cause: Option<String>,
+    },
+
+    /// Request processing errors (malformed requests, invalid data)
+    /// 
+    /// These errors occur when the request is malformed or contains invalid
+    /// data that prevents normal processing, such as:
+    /// - Invalid request format
+    /// - Missing required headers
+    /// - Corrupted request data
+    /// - Unsupported request features
+    /// 
+    /// **User Message**: Generic bad request message
+    /// **HTTP Status**: 400 Bad Request
+    /// **Logging**: Request details for debugging (sanitized)
+    RequestError {
+        /// Description of what's wrong with the request
+        details: String,
+        /// The problematic request component (headers, body, path, etc.)
+        component: String,
+    },
+
+    /// Service unavailable errors (temporary failures, rate limiting)
+    /// 
+    /// These errors occur when the service is temporarily unable to process
+    /// requests due to:
+    /// - System overload
+    /// - Temporary resource exhaustion
+    /// - Maintenance mode
+    /// - Rate limiting
+    /// 
+    /// **User Message**: Generic service unavailable message
+    /// **HTTP Status**: 503 Service Unavailable
+    /// **Logging**: Service status and resource usage details
+    ServiceUnavailable {
+        /// Reason why the service is unavailable
+        reason: String,
+        /// Estimated time until service recovery (if known)
+        retry_after: Option<u32>,
+    },
+}
+
+impl ApplicationError {
+    /// Converts an ApplicationError to the appropriate HTTP status code
+    /// 
+    /// This method maps each application error type to its corresponding HTTP
+    /// status code according to HTTP standards and security best practices.
+    /// 
+    /// ## Status Code Mapping:
+    /// 
+    /// - **Security Errors**: Use the specific status code from the security error
+    ///   - 400 Bad Request: For malformed or malicious requests
+    ///   - 405 Method Not Allowed: For unsupported HTTP methods
+    ///   - 413 Request Entity Too Large: For oversized requests
+    /// 
+    /// - **Internal Errors**: 500 Internal Server Error
+    ///   - Used for unexpected server-side failures
+    ///   - Indicates the problem is not the client's fault
+    /// 
+    /// - **Request Errors**: 400 Bad Request
+    ///   - Used for malformed or invalid client requests
+    ///   - Indicates the client needs to fix their request
+    /// 
+    /// - **Service Unavailable**: 503 Service Unavailable
+    ///   - Used for temporary service outages or overload
+    ///   - Indicates the client should retry later
+    pub fn to_http_status_code(&self) -> u16 {
+        match self {
+            ApplicationError::Security { security_error, .. } => {
+                security_error.to_http_status_code()
+            }
+            ApplicationError::InternalError { .. } => 500, // Internal Server Error
+            ApplicationError::RequestError { .. } => 400, // Bad Request
+            ApplicationError::ServiceUnavailable { .. } => 503, // Service Unavailable
+        }
+    }
+
+    /// Returns a generic error message safe for displaying to users
+    /// 
+    /// This method provides user-facing error messages that are generic enough
+    /// to avoid information disclosure while still being helpful to legitimate users.
+    /// 
+    /// ## Security Principles:
+    /// 
+    /// 1. **No Information Disclosure**: Messages don't reveal internal details,
+    ///    system architecture, file paths, or implementation specifics.
+    /// 
+    /// 2. **Generic but Helpful**: Provide enough information for legitimate users
+    ///    to understand what went wrong and potentially fix their request.
+    /// 
+    /// 3. **Consistent Format**: All messages follow the same professional tone
+    ///    and structure for a consistent user experience.
+    /// 
+    /// 4. **No Attack Vectors**: Messages don't contain any content that could
+    ///    be used for further attacks or reconnaissance.
+    /// 
+    /// ## Message Design Philosophy:
+    /// 
+    /// - Brief and clear explanations appropriate for end users
+    /// - Professional tone suitable for production applications
+    /// - No technical jargon that might confuse non-technical users
+    /// - Consistent formatting and punctuation across all error types
+    /// - Actionable guidance when appropriate (e.g., "try again later")
+    pub fn to_generic_user_message(&self) -> String {
+        match self {
+            ApplicationError::Security { security_error, .. } => {
+                // Use the security error's user-safe message
+                // These are already designed to be generic and safe
+                security_error.to_user_message()
+            }
+            ApplicationError::InternalError { .. } => {
+                // Generic message for internal server errors
+                // Don't reveal any details about what went wrong internally
+                "Internal Server Error. Please try again later.".to_string()
+            }
+            ApplicationError::RequestError { .. } => {
+                // Generic message for request errors
+                // Don't reveal specific details about what's wrong with the request
+                "Bad Request. Please check your request and try again.".to_string()
+            }
+            ApplicationError::ServiceUnavailable { retry_after, .. } => {
+                // Generic message for service unavailability
+                // Optionally include retry guidance if available
+                match retry_after {
+                    Some(seconds) => {
+                        format!("Service Temporarily Unavailable. Please try again in {} seconds.", seconds)
+                    }
+                    None => {
+                        "Service Temporarily Unavailable. Please try again later.".to_string()
+                    }
+                }
+            }
+        }
+    }
+
+    /// Returns detailed error information for logging and debugging
+    /// 
+    /// This method provides comprehensive error details that should only be
+    /// used for internal logging, monitoring, and debugging. These details
+    /// should never be exposed to end users as they may contain sensitive
+    /// information about the system's internal workings.
+    /// 
+    /// ## Security Considerations:
+    /// 
+    /// - Contains sensitive information about system internals
+    /// - Includes full error details for forensic analysis
+    /// - Should only be used for internal logging and monitoring
+    /// - Helps developers and security teams understand and fix issues
+    /// - May contain stack traces, file paths, and system information
+    /// 
+    /// ## Use Cases:
+    /// 
+    /// - Application debugging and troubleshooting
+    /// - Security incident response and analysis
+    /// - Performance monitoring and optimization
+    /// - Compliance logging and audit trails
+    /// - Error tracking and alerting systems
+    pub fn to_detailed_message(&self) -> String {
+        match self {
+            ApplicationError::Security { security_error, context } => {
+                format!(
+                    "Security Error in {}: {}",
+                    context,
+                    security_error.to_detailed_message()
+                )
+            }
+            ApplicationError::InternalError { details, cause } => {
+                match cause {
+                    Some(cause_info) => {
+                        format!("Internal Error: {} (Cause: {})", details, cause_info)
+                    }
+                    None => {
+                        format!("Internal Error: {}", details)
+                    }
+                }
+            }
+            ApplicationError::RequestError { details, component } => {
+                format!("Request Error in {}: {}", component, details)
+            }
+            ApplicationError::ServiceUnavailable { reason, retry_after } => {
+                match retry_after {
+                    Some(seconds) => {
+                        format!("Service Unavailable: {} (Retry after {} seconds)", reason, seconds)
+                    }
+                    None => {
+                        format!("Service Unavailable: {}", reason)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Creates a generic error response that prevents information disclosure
+/// 
+/// This function is the primary interface for creating error responses in our
+/// application. It ensures that all error responses follow security best practices
+/// by providing generic user messages while logging detailed error information.
+/// 
+/// ## Security Features:
+/// 
+/// 1. **Generic User Messages**: All error messages shown to users are generic
+///    and don't reveal internal system details, implementation specifics, or
+///    sensitive information that could be used by attackers.
+/// 
+/// 2. **Comprehensive Logging**: Full error details are logged internally for
+///    debugging, security monitoring, and incident response, but never exposed
+///    to end users.
+/// 
+/// 3. **Consistent Security Headers**: All error responses include the same
+///    security headers as successful responses to maintain consistent security
+///    posture across all endpoints.
+/// 
+/// 4. **Appropriate HTTP Status Codes**: Each error type maps to the most
+///    appropriate HTTP status code according to RFC standards.
+/// 
+/// ## Information Disclosure Prevention:
+/// 
+/// This function prevents several types of information disclosure:
+/// 
+/// - **System Architecture**: No details about internal system structure
+/// - **File Paths**: No server file system paths or directory structures
+/// - **Database Schemas**: No database table names, column names, or queries
+/// - **Stack Traces**: No internal code execution paths or function names
+/// - **Configuration Details**: No server configuration or environment info
+/// - **Third-party Services**: No details about external dependencies
+/// - **Error Causes**: No specific reasons why operations failed internally
+/// 
+/// ## Error Response Format:
+/// 
+/// All error responses use plain text content type and include:
+/// - Appropriate HTTP status code
+/// - Generic, user-friendly error message
+/// - Complete set of security headers
+/// - Allow header for 405 Method Not Allowed responses
+/// 
+/// ## Parameters:
+/// - `error`: The ApplicationError containing full error details
+/// 
+/// ## Return Value:
+/// - `Ok(Response<Body>)`: Successfully created error response
+/// - `Err(Error)`: Failed to create response (rare, indicates system issue)
+/// 
+/// ## Usage Examples:
+/// 
+/// ```text
+/// // Security error
+/// let security_err = ApplicationError::Security {
+///     security_error: SecurityError::InvalidMethod { 
+///         method: "POST".to_string(), 
+///         path: "/".to_string() 
+///     },
+///     context: "request validation".to_string(),
+/// };
+/// let response = create_generic_error_response(security_err)?;
+/// 
+/// // Internal error
+/// let internal_err = ApplicationError::InternalError {
+///     details: "Failed to allocate memory for response".to_string(),
+///     cause: Some("Out of memory".to_string()),
+/// };
+/// let response = create_generic_error_response(internal_err)?;
+/// ```
+pub fn create_generic_error_response(error: ApplicationError) -> Result<Response<Body>, Error> {
+    // Log the detailed error information for internal monitoring and debugging
+    // This provides full context for developers and security teams while
+    // keeping sensitive details away from end users
+    log::error!(
+        "[{}] [ERROR] Returning generic error response: status={} detailed_error=\"{}\"",
+        chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ"),
+        error.to_http_status_code(),
+        error.to_detailed_message()
+    );
+    
+    // Get the appropriate HTTP status code for this error type
+    let status_code = error.to_http_status_code();
+    
+    // Get the generic, user-safe error message
+    // This message is designed to be helpful to legitimate users while
+    // not revealing any sensitive information to potential attackers
+    let user_message = error.to_generic_user_message();
+    
+    // Build the error response with consistent security headers
+    let mut response_builder = Response::builder()
+        .status(status_code)
+        .header("content-type", "text/plain")  // Plain text for error messages
+        // Include all security headers to maintain consistent security posture
+        .header("x-frame-options", "DENY")  // Prevent clickjacking attacks
+        .header("x-content-type-options", "nosniff")  // Prevent MIME type sniffing
+        .header("content-security-policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")  // Restrict resource loading
+        .header("x-xss-protection", "1; mode=block")  // Enable XSS filtering with blocking mode
+        .header("strict-transport-security", "max-age=31536000");  // Enforce HTTPS for 1 year
+    
+    // Add Allow header for 405 Method Not Allowed responses
+    // This tells the client which HTTP methods are supported
+    if status_code == 405 {
+        response_builder = response_builder.header("allow", "GET");
+    }
+    
+    // Add Retry-After header for 503 Service Unavailable responses
+    // This tells the client when they should try again
+    if let ApplicationError::ServiceUnavailable { retry_after: Some(seconds), .. } = &error {
+        response_builder = response_builder.header("retry-after", seconds.to_string());
+    }
+    
+    // Build the final response with the generic user message
+    let response = response_builder
+        .body(user_message.into())
+        .map_err(Box::new)?;
+    
+    Ok(response)
+}
+
 /// Creates an error response with the specified status code and message
 /// 
 /// This function provides a consistent way to create error responses across
 /// the application. All error responses use plain text content type and
 /// include appropriate security headers.
+/// 
+/// ## Deprecation Notice:
+/// 
+/// This function is maintained for backward compatibility, but new code should
+/// use `create_generic_error_response()` with `ApplicationError` for better
+/// security and consistency.
 /// 
 /// ## Parameters:
 /// - `status_code`: HTTP status code (400, 405, 413, 500, etc.)
