@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 09acf79bb416a2f4b89569d07572d25dd33f7311b81cfdd459d41462b84cc4c6 # shrinks to path = "_", method = "POST", add_malicious_path = false, make_oversized_request = false

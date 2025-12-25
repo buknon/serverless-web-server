@@ -1,0 +1,60 @@
+[package]
+name = "static-web-lambda"
+version = "0.1.0"
+edition = "2021"
+authors = ["Tristan Miche <tmiche@ippon.fr>"]
+description = "A simple Rust-based webserver that serves a single static HTML page on AWS Lambda"
+license = "MIT"
+repository = "https://github.com/buknon/static-web-lambda"
+keywords = ["lambda", "serverless", "rust", "web", "static"]
+categories = ["web-programming::http-server"]
+
+[dependencies]
+# Core AWS Lambda runtime dependencies
+# lambda_runtime: Official AWS Lambda runtime for Rust - handles the Lambda execution environment,
+# manages the event loop, and provides the interface between your Rust code and AWS Lambda
+lambda_runtime = "0.8"
+
+# lambda_http: HTTP-specific Lambda event handling - converts Lambda Function URL events
+# into standard HTTP requests and responses, making it easy to build web applications
+lambda_http = "0.8"
+
+# Supporting dependencies for async runtime and JSON handling
+# tokio: Asynchronous runtime for Rust - required by lambda_runtime for handling async operations.
+# AWS Lambda functions are inherently asynchronous, and tokio provides the event loop and async
+# task scheduling needed to run async functions like our Lambda handler
+tokio = { version = "1.0", features = ["macros"] }
+
+# serde_json: JSON serialization and deserialization library - used for handling JSON data
+# in Lambda responses and for any configuration or logging that requires JSON format.
+# Essential for working with AWS Lambda's JSON-based event and response format
+serde_json = "1.0"
+
+# hyper: HTTP library used by lambda_http internally - needed for body handling in tests
+# This allows us to extract and test the actual HTML content produced by the Lambda function
+hyper = { version = "0.14", features = ["full"] }
+
+# log: Logging facade for Rust - provides a common interface for logging across libraries
+# Allows us to use different logging implementations without changing our code
+log = "0.4"
+
+# env_logger: Simple logger implementation for the log crate - outputs to stdout/stderr
+# Perfect for AWS Lambda where logs are captured by CloudWatch automatically
+env_logger = "0.10"
+
+# chrono: Date and time library for Rust - provides timestamp functionality for structured logging
+# Essential for adding timestamps to log entries for debugging and monitoring
+chrono = { version = "0.4", features = ["serde"] }
+
+[dev-dependencies]
+# proptest: Property-based testing framework for Rust - generates random test inputs
+# to verify that properties hold across a wide range of inputs. Essential for comprehensive
+# testing of input sanitization and security validation functions
+proptest = "1.0"
+
+# tokio-test: Testing utilities for tokio-based async code - provides block_on function
+# to run async functions in property tests where we can't use #[tokio::test]
+tokio-test = "0.4"
+
+# AWS Lambda cross-compilation configuration is handled in .cargo/config.toml
+# This avoids duplicate linker configurations and eliminates warnings during local testing
