@@ -136,7 +136,7 @@ This implementation plan breaks down the static web Lambda project into small, d
   - **Property 4: Request Logging**
   - **Validates: Requirements 2.4**
 
-- [ ] 28. Create security error types
+- [x] 28. Create security error types
   - Define enum for different security violation types
   - Add conversion to HTTP status codes
   - _Requirements: 5.4, 3.4_

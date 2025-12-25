@@ -133,12 +133,13 @@ fn test_sanitize_path_directory_traversal() {
     for path in malicious_paths {
         let result = sanitize_path(path);
         assert!(result.is_err(), "Malicious path '{}' should be rejected", path);
-        let error_msg = result.unwrap_err();
+        let error = result.unwrap_err();
+        let detailed_msg = error.to_detailed_message();
         assert!(
-            error_msg.contains("parent directory") || error_msg.contains("current directory"),
+            detailed_msg.contains("parent directory") || detailed_msg.contains("current directory"),
             "Error message for '{}' should mention directory reference: {}",
             path,
-            error_msg
+            detailed_msg
         );
     }
 }
@@ -160,12 +161,13 @@ fn test_sanitize_path_encoded_traversal() {
     for path in encoded_attacks {
         let result = sanitize_path(path);
         assert!(result.is_err(), "Encoded attack path '{}' should be rejected", path);
-        let error_msg = result.unwrap_err();
+        let error = result.unwrap_err();
+        let detailed_msg = error.to_detailed_message();
         assert!(
-            error_msg.contains("encoded traversal"),
+            detailed_msg.contains("encoded traversal"),
             "Error message for '{}' should mention encoded traversal: {}",
             path,
-            error_msg
+            detailed_msg
         );
     }
 }
@@ -189,12 +191,13 @@ fn test_sanitize_path_dangerous_characters() {
     for path in dangerous_paths {
         let result = sanitize_path(path);
         assert!(result.is_err(), "Path with dangerous characters '{}' should be rejected", path);
-        let error_msg = result.unwrap_err();
+        let error = result.unwrap_err();
+        let detailed_msg = error.to_detailed_message();
         assert!(
-            error_msg.contains("dangerous character"),
+            detailed_msg.contains("dangerous character"),
             "Error message for '{}' should mention dangerous character: {}",
             path,
-            error_msg
+            detailed_msg
         );
     }
 }
@@ -214,11 +217,12 @@ fn test_sanitize_path_null_bytes() {
     for path in null_byte_paths {
         let result = sanitize_path(path);
         assert!(result.is_err(), "Path with null byte should be rejected");
-        let error_msg = result.unwrap_err();
+        let error = result.unwrap_err();
+        let detailed_msg = error.to_detailed_message();
         assert!(
-            error_msg.contains("null byte"),
+            detailed_msg.contains("null byte"),
             "Error message should mention null byte: {}",
-            error_msg
+            detailed_msg
         );
     }
 }
@@ -233,11 +237,12 @@ fn test_sanitize_path_long_paths() {
     
     let result = sanitize_path(&long_path);
     assert!(result.is_err(), "Excessively long path should be rejected");
-    let error_msg = result.unwrap_err();
+    let error = result.unwrap_err();
+    let detailed_msg = error.to_detailed_message();
     assert!(
-        error_msg.contains("too long"),
+        detailed_msg.contains("too long"),
         "Error message should mention path length: {}",
-        error_msg
+        detailed_msg
     );
 }
 
@@ -255,12 +260,13 @@ fn test_validate_http_method() {
     for method in invalid_methods {
         let result = validate_http_method(method);
         assert!(result.is_err(), "Method '{}' should be rejected", method);
-        let error_msg = result.unwrap_err();
+        let error = result.unwrap_err();
+        let detailed_msg = error.to_detailed_message();
         assert!(
-            error_msg.contains("not allowed"),
-            "Error message for '{}' should mention not allowed: {}",
+            detailed_msg.contains("Invalid HTTP method") || detailed_msg.contains("not allowed"),
+            "Error message for '{}' should mention method validation: {}",
             method,
-            error_msg
+            detailed_msg
         );
     }
 }

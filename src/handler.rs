@@ -274,10 +274,10 @@ pub async fn function_handler(request: Request) -> Result<Response<Body>, Error>
     // This status code indicates that the request entity is larger than limits
     // defined by server. The server is closing the connection or returning a
     // Retry-After header field indicating when to try again.
-    if let Err(_error_message) = validate_request_size(&request) {
+    if let Err(security_error) = validate_request_size(&request) {
         let response = create_error_response(
-            413, 
-            "Request Entity Too Large. Request exceeds maximum allowed size."
+            security_error.to_http_status_code(),
+            &security_error.to_user_message()
         )?;
         
         // Log error response with processing time (Task 26 - Requirements 2.4)
@@ -298,12 +298,12 @@ pub async fn function_handler(request: Request) -> Result<Response<Body>, Error>
     // This status code indicates that the server knows the request method,
     // but the target resource doesn't support this method. For a static web server,
     // only GET requests make sense since we're serving read-only content.
-    if let Err(_error_message) = validate_http_method(request.method().as_str()) {
+    if let Err(security_error) = validate_http_method(request.method().as_str()) {
         // Return HTTP 405 Method Not Allowed for any non-GET request
         // Use create_error_response to ensure all security headers are included
         let response = create_error_response(
-            405, 
-            "Method Not Allowed. This server only supports GET requests."
+            security_error.to_http_status_code(),
+            &security_error.to_user_message()
         )?;
         
         // Log error response with processing time (Task 26 - Requirements 2.4)
@@ -339,18 +339,18 @@ pub async fn function_handler(request: Request) -> Result<Response<Body>, Error>
                   Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ"),
                   request.uri().path());
         }
-        Err(error_message) => {
+        Err(security_error) => {
             // Path contains malicious content, reject the request
             warn!("[{}] [SECURITY] Rejecting request due to malicious path: error={} path={}", 
                   Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ"),
-                  error_message,
+                  security_error.to_detailed_message(),
                   request.uri().path());
             
             // Return HTTP 400 Bad Request for malicious paths
             // We provide a generic error message to avoid information disclosure
             let response = create_error_response(
-                400, 
-                "Bad Request. Invalid request path."
+                security_error.to_http_status_code(),
+                &security_error.to_user_message()
             )?;
             
             // Log error response with processing time (Task 26 - Requirements 2.4)
