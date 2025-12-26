@@ -23,7 +23,8 @@ lambda_http = "0.8"
 # tokio: Asynchronous runtime for Rust - required by lambda_runtime for handling async operations.
 # AWS Lambda functions are inherently asynchronous, and tokio provides the event loop and async
 # task scheduling needed to run async functions like our Lambda handler
-tokio = { version = "1.0", features = ["macros"] }
+# Added signal feature for graceful shutdown handling in local development mode
+tokio = { version = "1.0", features = ["macros", "signal"] }
 
 # serde_json: JSON serialization and deserialization library - used for handling JSON data
 # in Lambda responses and for any configuration or logging that requires JSON format.

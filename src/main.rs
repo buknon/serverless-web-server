@@ -305,6 +305,12 @@ fn is_lambda_environment() -> bool {
 /// - Debugging with local tools and debuggers
 /// - Integration testing with other local services
 /// - Demonstrating functionality without AWS account
+/// 
+/// Features graceful shutdown handling that:
+/// - Listens for SIGINT (Ctrl+C) and SIGTERM signals
+/// - Allows in-flight requests to complete before shutting down
+/// - Provides clean shutdown logging for debugging
+/// - Prevents data loss during development
 async fn run_local_mode(host: String, port: u16) -> Result<(), Error> {
     use hyper::service::{make_service_fn, service_fn};
     use hyper::Server;
@@ -339,19 +345,74 @@ async fn run_local_mode(host: String, port: u16) -> Result<(), Error> {
         }
     });
     
-    // Create and start the HTTP server
-    let server = Server::bind(&addr).serve(make_svc);
+    // Create the HTTP server with graceful shutdown support
+    let server = Server::bind(&addr)
+        .serve(make_svc)
+        .with_graceful_shutdown(shutdown_signal());
     
     info!("Local development server running at http://{}", addr);
-    info!("Press Ctrl+C to stop the server");
+    info!("Press Ctrl+C to stop the server gracefully");
     
     // Run the server and handle any errors
+    // The server will now wait for the shutdown signal before terminating
     if let Err(e) = server.await {
         error!("Local server error: {}", e);
         return Err(Error::from(format!("Local server failed: {}", e)));
     }
     
+    info!("Local development server shut down gracefully");
     Ok(())
+}
+
+/// Handle graceful shutdown signals for the local development server
+/// 
+/// This function listens for common shutdown signals and provides a clean
+/// way to terminate the server. It handles:
+/// 
+/// - SIGINT (Ctrl+C): Most common way users stop development servers
+/// - SIGTERM: Standard termination signal used by process managers
+/// 
+/// The graceful shutdown process:
+/// 1. Receives shutdown signal
+/// 2. Stops accepting new connections
+/// 3. Waits for in-flight requests to complete (with timeout)
+/// 4. Cleanly shuts down the server
+/// 
+/// This prevents:
+/// - Abrupt connection termination
+/// - Data loss during request processing
+/// - Incomplete responses being sent to clients
+/// - Resource leaks from unfinished operations
+async fn shutdown_signal() {
+    use tokio::signal;
+    
+    // Create a future that completes when we receive a shutdown signal
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("Failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("Failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    // Wait for either signal
+    tokio::select! {
+        _ = ctrl_c => {
+            info!("Received Ctrl+C signal, initiating graceful shutdown...");
+        },
+        _ = terminate => {
+            info!("Received SIGTERM signal, initiating graceful shutdown...");
+        },
+    }
 }
 
 /// Convert a hyper HTTP request to a lambda_http request

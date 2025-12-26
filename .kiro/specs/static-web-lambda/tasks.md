@@ -169,7 +169,7 @@ This implementation plan breaks down the static web Lambda project into small, d
   - Use the same handler function as Lambda
   - _Requirements: 5.1, 5.2_
 
-- [ ] 35. Add local server configuration
+- [x] 35. Add local server configuration
   - Make port and host configurable via command line
   - Add graceful shutdown handling
   - _Requirements: 5.1_
