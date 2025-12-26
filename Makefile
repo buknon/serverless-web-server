@@ -1,7 +1,7 @@
 # Makefile for Static Web Lambda project
 # This provides convenient commands for development and testing
 
-.PHONY: help build test test-html run clean check build-lambda build-docker build-local deploy-package
+.PHONY: help build test test-html run clean check build-lambda build-docker build-local deploy-package package-zip
 
 # Default target - show help
 help:
@@ -20,6 +20,7 @@ help:
 	@echo "  make build-docker    - Build Lambda package using Docker"
 	@echo "  make build-local     - Build Lambda package using local cross-compilation"
 	@echo "  make deploy-package  - Create deployment package from existing binary"
+	@echo "  make package-zip     - Create ZIP package from bootstrap executable"
 	@echo ""
 	@echo "🧪 After making changes, run: make test-html"
 	@echo "🚀 For deployment, run: make build-lambda"
@@ -77,3 +78,8 @@ build-local:
 deploy-package:
 	@echo "📦 Creating deployment package..."
 	@./scripts/build-lambda.sh --package-only
+
+# Create ZIP package from bootstrap executable
+package-zip:
+	@echo "📦 Creating ZIP package from bootstrap executable..."
+	@./scripts/package-lambda.sh

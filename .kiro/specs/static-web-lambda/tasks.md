@@ -190,14 +190,14 @@ This implementation plan breaks down the static web Lambda project into small, d
   - Document deployment build options (AWS CodeBuild, Docker, local builds)
   - _Requirements: 6.1, 6.2_
 
-- [ ] 39. Add Docker-based Lambda build
+- [x] 39. Add Docker-based Lambda build
   - Create Dockerfile for cross-compilation to Linux
   - Add script to build Lambda-compatible binary using Docker
   - Rename compiled binary to `bootstrap` (required by Lambda)
   - Add executable permissions and validation
   - _Requirements: 6.2_
 
-- [ ] 40. Implement ZIP packaging
+- [x] 40. Implement ZIP packaging
   - Create ZIP file containing bootstrap executable
   - Validate ZIP file structure
   - _Requirements: 6.2_
