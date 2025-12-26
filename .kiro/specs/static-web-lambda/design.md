@@ -97,14 +97,17 @@ Response {
 
 **Components**:
 - `Cargo.toml`: Rust project configuration with Lambda dependencies
-- Build script: Cross-compilation for Lambda runtime (Amazon Linux)
+- `Dockerfile.build`: Amazon Linux 2 Docker build environment (same as Lambda runtime)
+- Build script: Native compilation on Amazon Linux 2 for complete compatibility
 - Packaging: Create ZIP file for Terraform deployment
 
 **Build Process**:
-1. Cross-compile Rust code for `x86_64-unknown-linux-gnu` target
-2. Create `bootstrap` executable (required name for Lambda custom runtime)
-3. Package into ZIP file for Lambda deployment
-4. Terraform references the ZIP file for function deployment
+1. Use Docker with Amazon Linux 2 base image (same as AWS Lambda runtime)
+2. Install Rust 1.83 natively on Amazon Linux 2 for complete compatibility
+3. Compile Rust code natively (no cross-compilation needed)
+4. Create `bootstrap` executable (required name for Lambda custom runtime)
+5. Package into ZIP file for Lambda deployment
+6. Terraform references the ZIP file for function deployment
 
 ## Data Models
 

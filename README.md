@@ -6,7 +6,8 @@ A simple Rust-based webserver that serves a single static HTML page on AWS Lambd
 
 ### Prerequisites
 
-- **Rust** (1.70 or later) - [Install Rust](https://rustup.rs/)
+- **Rust** (1.83 or later) - [Install Rust](https://rustup.rs/)
+- **Docker** (for Lambda builds) - [Install Docker](https://docs.docker.com/get-docker/)
 - **AWS CLI** (optional, for deployment) - [Install AWS CLI](https://aws.amazon.com/cli/)
 
 ### Environment Setup
@@ -17,28 +18,16 @@ A simple Rust-based webserver that serves a single static HTML page on AWS Lambd
    source ~/.cargo/env
    ```
 
-2. **Add AWS Lambda targets** (required for deployment):
-   ```bash
-   # Add x86_64 Linux target (required)
-   rustup target add x86_64-unknown-linux-gnu
-   
-   # Optional: Add ARM64 target for better price/performance
-   rustup target add aarch64-unknown-linux-gnu
-   ```
+2. **Install Docker** (required for Lambda builds):
+   - **macOS**: Download Docker Desktop from [docker.com](https://www.docker.com/products/docker-desktop)
+   - **Linux**: Follow [Docker installation guide](https://docs.docker.com/engine/install/)
+   - **Windows**: Download Docker Desktop from [docker.com](https://www.docker.com/products/docker-desktop)
 
-3. **Install cross-compilation tools** (macOS):
-   ```bash
-   # Using Homebrew
-   brew install FiloSottile/musl-cross/musl-cross
-   # OR
-   brew install x86_64-linux-gnu-gcc
-   ```
-
-4. **Clone and setup**:
+3. **Clone and setup**:
    ```bash
    git clone <your-repo-url>
    cd static-web-lambda
-   cargo build
+   cargo build  # For local development
    ```
 
 ## 🎯 Execution Modes
@@ -315,16 +304,21 @@ RUST_LOG=info ./target/debug/static-web-lambda --mode local
 cargo build
 ```
 
-### Production Build for Lambda
+### Production Build for Lambda (Docker - Recommended)
 ```bash
-# Build for x86_64 Lambda (traditional)
-cargo build --release --target x86_64-unknown-linux-gnu
+# Build using Docker with Amazon Linux 2 (matches Lambda runtime exactly)
+./scripts/build-lambda.sh docker
 
-# Build for ARM64 Lambda (Graviton - better price/performance)
-cargo build --release --target aarch64-unknown-linux-gnu
+# This creates a lambda-deployment.zip file ready for deployment
 ```
 
-The binary will be created in `target/{target}/release/static-web-lambda`.
+### Alternative: Local Cross-compilation Build
+```bash
+# Build for x86_64 Lambda using local toolchain
+./scripts/build-lambda.sh local
+```
+
+The Docker approach is recommended as it uses the same Amazon Linux 2 base image as AWS Lambda, ensuring complete glibc compatibility and avoiding runtime issues.
 
 ## 📁 Project Structure
 
@@ -363,16 +357,25 @@ All security features are validated through property-based tests.
 
 ### Common Issues
 
-1. **Cross-compilation errors**:
+1. **Docker build errors**:
    ```bash
-   # Ensure targets are installed
-   rustup target list --installed | grep linux-gnu
+   # Ensure Docker is running
+   docker info
    
-   # Reinstall if missing
-   rustup target add x86_64-unknown-linux-gnu
+   # Try with verbose output
+   ./scripts/build-lambda.sh docker --verbose
    ```
 
-2. **Test failures**:
+2. **Local cross-compilation errors**:
+   ```bash
+   # Ensure Linux target is installed
+   rustup target add x86_64-unknown-linux-gnu
+   
+   # Clean and retry
+   ./scripts/build-lambda.sh local --clean
+   ```
+
+3. **Test failures**:
    ```bash
    # Run tests with detailed output
    cargo test -- --nocapture
@@ -381,19 +384,23 @@ All security features are validated through property-based tests.
    cargo test test_name
    ```
 
-3. **Property test failures**:
+4. **Property test failures**:
    - Check `proptest-regressions/` for saved failing cases
    - Property tests save counterexamples for debugging
    - Run `cargo test` again to verify fixes
 
 ### Alternative Build with Docker
 
-If cross-compilation is problematic:
+The project includes a Docker-based build system that uses Amazon Linux 2 (same as AWS Lambda runtime):
 
 ```bash
-# Build using official Rust Docker image
-docker run --rm -v "$PWD":/usr/src/myapp -w /usr/src/myapp rust:1.70 cargo build --release --target x86_64-unknown-linux-gnu
+# Build Lambda deployment package using Docker
+./scripts/build-lambda.sh docker
+
+# This creates lambda-deployment.zip ready for deployment
 ```
+
+This approach is recommended as it ensures complete compatibility with AWS Lambda runtime environment.
 
 ## 📚 Dependencies
 
@@ -413,20 +420,25 @@ docker run --rm -v "$PWD":/usr/src/myapp -w /usr/src/myapp rust:1.70 cargo build
 
 ## 🚀 Deployment
 
-After building for the target architecture, package the binary for AWS Lambda deployment:
+The project includes automated build scripts for creating Lambda deployment packages:
 
-1. Build for Lambda:
+1. **Build Lambda package using Docker** (recommended):
    ```bash
-   cargo build --release --target x86_64-unknown-linux-gnu
+   ./scripts/build-lambda.sh docker
    ```
 
-2. Package the binary (rename to `bootstrap` for Lambda):
+2. **Alternative: Build using local cross-compilation**:
    ```bash
-   cp target/x86_64-unknown-linux-gnu/release/static-web-lambda bootstrap
-   zip lambda-deployment.zip bootstrap
+   ./scripts/build-lambda.sh local
    ```
 
-3. Deploy using AWS CLI, CDK, or the AWS Console.
+3. **Deploy the generated package**:
+   ```bash
+   # The build script creates lambda-deployment.zip
+   # Deploy using AWS CLI, CDK, Terraform, or AWS Console
+   ```
+
+The Docker build uses Amazon Linux 2 (same as Lambda runtime) to ensure complete compatibility.
 
 ## 📄 License
 

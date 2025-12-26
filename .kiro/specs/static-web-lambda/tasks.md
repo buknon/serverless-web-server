@@ -21,10 +21,10 @@ This implementation plan breaks down the static web Lambda project into small, d
   - Add comments explaining why these dependencies are needed
   - _Requirements: 6.1_
 
-- [x] 4. Configure cross-compilation target (REMOVED)
-  - Cross-compilation setup has been removed due to compatibility issues
-  - Project now uses native compilation for local development
-  - Lambda deployment will use CI/CD or Docker-based builds
+- [x] 4. Configure Amazon Linux 2 Docker build (UPDATED)
+  - Create custom Dockerfile.build using Amazon Linux 2 base image (same as AWS Lambda runtime)
+  - Install Rust 1.83 natively on Amazon Linux 2 for complete compatibility
+  - Use native compilation instead of cross-compilation to eliminate glibc version mismatches
   - _Requirements: 6.1_
 
 - [x] 5. Create basic main.rs skeleton
@@ -184,17 +184,18 @@ This implementation plan breaks down the static web Lambda project into small, d
   - _Requirements: 5.1_
 
 - [x] 38. Create deployment build management
-  - Create build script that handles native compilation and deployment preparation
-  - Add Docker-based cross-compilation option for Lambda compatibility
+  - Create build script that handles Amazon Linux 2 Docker builds and deployment preparation
+  - Add Docker-based build using Amazon Linux 2 base image for complete Lambda compatibility
   - Include build validation and error handling
-  - Document deployment build options (AWS CodeBuild, Docker, local builds)
+  - Document deployment build options (Docker with Amazon Linux 2, local cross-compilation, AWS CodeBuild)
   - _Requirements: 6.1, 6.2_
 
-- [x] 39. Add Docker-based Lambda build
-  - Create Dockerfile for cross-compilation to Linux
-  - Add script to build Lambda-compatible binary using Docker
+- [x] 39. Add Docker-based Lambda build with Amazon Linux 2
+  - Create Dockerfile.build using Amazon Linux 2 base image (same as AWS Lambda runtime)
+  - Install Rust 1.83 natively on Amazon Linux 2 for native compilation
   - Rename compiled binary to `bootstrap` (required by Lambda)
   - Add executable permissions and validation
+  - Eliminate glibc version mismatches through native compilation
   - _Requirements: 6.2_
 
 - [x] 40. Implement ZIP packaging
@@ -304,10 +305,13 @@ This implementation plan breaks down the static web Lambda project into small, d
 - [ ] 59. Final checkpoint - Complete system validation
   - Ensure all tests pass, ask the user if questions arise.
 
-- [x] 60. Fix GLIBC compatibility issue
-  - Rebuild Lambda function using Docker-based cross-compilation to ensure compatibility with AWS Lambda runtime
-  - Verify the bootstrap binary is built for x86_64-unknown-linux-gnu target
-  - Test deployment to ensure GLIBC version compatibility
+- [x] 60. Fix GLIBC compatibility issue (COMPLETED)
+  - Updated Dockerfile.build to use Amazon Linux 2 base image (same as AWS Lambda runtime)
+  - Changed from cross-compilation to native compilation on Amazon Linux 2
+  - Installed Rust 1.83 natively on Amazon Linux 2 for complete compatibility
+  - Updated build scripts to use Amazon Linux 2 Docker approach
+  - Verified bootstrap binary is built with correct glibc dependencies
+  - Updated documentation to reflect Amazon Linux 2 approach
   - _Requirements: 6.1, 6.2_
 
 ## Notes

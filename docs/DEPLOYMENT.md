@@ -4,9 +4,11 @@ This guide covers all deployment build options for the Static Web Lambda project
 
 ## Overview
 
+## Overview
+
 The Static Web Lambda project supports multiple build methods to create AWS Lambda-compatible deployment packages:
 
-1. **Docker Build** (Recommended) - Cross-platform compatible, uses containerized Linux environment
+1. **Docker Build** (Recommended) - Uses Amazon Linux 2 base image matching AWS Lambda runtime exactly
 2. **Local Cross-compilation** - Uses local Rust toolchain with Linux target
 3. **Native Build** - For local testing only (not Lambda-compatible unless on Amazon Linux)
 4. **AWS CodeBuild** - Cloud-based build service with native Linux environment
@@ -29,7 +31,7 @@ This will create a `lambda-deployment.zip` file ready for AWS Lambda deployment.
 
 ### 1. Docker Build (Recommended)
 
-Docker builds provide the most reliable cross-platform compatibility by using a Linux container environment.
+Docker builds provide the most reliable AWS Lambda compatibility by using the same Amazon Linux 2 base image as the Lambda runtime environment.
 
 **Prerequisites:**
 - Docker installed and running
@@ -42,25 +44,24 @@ Docker builds provide the most reliable cross-platform compatibility by using a 
 
 # Clean build with verbose output
 ./scripts/build-lambda.sh docker --clean --verbose
-
-# Use custom Docker image
-DOCKER_IMAGE=rust:1.70-slim ./scripts/build-lambda.sh docker
 ```
 
 **Advantages:**
+- Uses Amazon Linux 2 (same as AWS Lambda runtime)
+- Complete glibc compatibility - no version mismatches
 - Works on any platform (macOS, Windows, Linux)
 - Consistent build environment
 - No local cross-compilation setup required
 - Reproducible builds
 
 **How it works:**
-1. Uses official Rust Docker image (`rust:1.83`) with explicit `linux/amd64` platform
-2. Installs Linux target (`x86_64-unknown-linux-gnu`)
-3. Compiles project in containerized Linux environment
+1. Uses custom `Dockerfile.build` with Amazon Linux 2 base image
+2. Installs Rust 1.83 natively on Amazon Linux 2
+3. Compiles project using native compilation (no cross-compilation needed)
 4. Creates deployment package with `bootstrap` executable
 
 **Platform Compatibility:**
-- Works on Apple Silicon (M1/M2) Macs by using `--platform linux/amd64`
+- Works on Apple Silicon (M1/M2) Macs using `--platform linux/amd64`
 - Works on Intel Macs and Linux systems
 - Works on Windows with Docker Desktop
 
@@ -100,7 +101,7 @@ TARGET_ARCH=x86_64-unknown-linux-musl ./scripts/build-lambda.sh local
 - Platform-specific linking issues possible
 - Requires local Rust toolchain with cross-compilation support
 
-**macOS Note:** Local cross-compilation from macOS to Linux may require additional linker setup. Docker build is recommended for macOS users.
+**macOS Note:** The Docker build approach is recommended for all platforms as it ensures complete compatibility with AWS Lambda runtime environment.
 
 ### 3. Native Build (Testing Only)
 
