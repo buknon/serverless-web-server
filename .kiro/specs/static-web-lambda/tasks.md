@@ -159,12 +159,12 @@ This implementation plan breaks down the static web Lambda project into small, d
 - [x] 32. Checkpoint - Core functionality complete
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 33. Add command-line argument parsing
+- [x] 33. Add command-line argument parsing
   - Use `clap` crate to parse local vs Lambda execution mode
   - Add help text explaining different modes
   - _Requirements: 5.1, 4.1_
 
-- [ ] 34. Create local HTTP server
+- [x] 34. Create local HTTP server
   - Implement local development server using `hyper` or similar
   - Use the same handler function as Lambda
   - _Requirements: 5.1, 5.2_

@@ -46,6 +46,11 @@ env_logger = "0.10"
 # Essential for adding timestamps to log entries for debugging and monitoring
 chrono = { version = "0.4", features = ["serde"] }
 
+# clap: Command-line argument parser for Rust - provides easy-to-use CLI interface
+# Allows us to parse command-line arguments for local vs Lambda execution modes
+# Features: derive for procedural macros, env for environment variable support
+clap = { version = "4.0", features = ["derive", "env"] }
+
 [dev-dependencies]
 # proptest: Property-based testing framework for Rust - generates random test inputs
 # to verify that properties hold across a wide range of inputs. Essential for comprehensive

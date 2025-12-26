@@ -41,6 +41,140 @@ A simple Rust-based webserver that serves a single static HTML page on AWS Lambd
    cargo build
    ```
 
+## 🎯 Execution Modes
+
+This application supports two execution modes to provide flexibility for both development and production deployment:
+
+### 🏠 Local Development Mode
+
+Run the application as a local HTTP server for development and testing:
+
+```bash
+# Run with default settings (localhost:3000)
+./target/debug/static-web-lambda --mode local
+
+# Customize host and port
+./target/debug/static-web-lambda --mode local --host 127.0.0.1 --port 8080
+
+# Allow external connections (less secure)
+./target/debug/static-web-lambda --mode local --host 0.0.0.0 --port 3000
+```
+
+**Local Mode Features:**
+- 🚀 **Rapid Development**: Test changes instantly without AWS deployment
+- 🔍 **Easy Debugging**: Use local debugging tools and IDE integration
+- 🔒 **Same Security**: All security features work identically to Lambda mode
+- 📝 **Consistent Logging**: Same structured logging format as production
+- 🎯 **Identical Behavior**: Uses the exact same handler function as Lambda
+
+**Local Mode Use Cases:**
+- Development and testing new features
+- Debugging issues without AWS costs
+- Integration testing with other local services
+- Demonstrating functionality without AWS account
+- Learning Rust and serverless concepts
+
+### ☁️ Lambda Production Mode
+
+Run the application on AWS Lambda for production deployment:
+
+```bash
+# Lambda mode (default - used when deployed to AWS)
+./target/debug/static-web-lambda --mode lambda
+
+# Or simply (lambda is the default mode)
+./target/debug/static-web-lambda
+```
+
+**Lambda Mode Features:**
+- 🌐 **Serverless Scaling**: Automatic scaling based on traffic
+- 💰 **Cost Efficient**: Pay only for actual requests
+- 🔐 **AWS Integration**: Native CloudWatch logging and monitoring
+- 🚀 **Global Distribution**: Deploy to multiple AWS regions
+- 🛡️ **AWS Security**: Leverage AWS security and compliance features
+
+**Lambda Mode Requirements:**
+- Must be deployed to AWS Lambda environment
+- Requires AWS Lambda environment variables
+- Uses AWS Lambda Function URLs for HTTP access
+- Logs automatically sent to CloudWatch
+
+### 🔄 Mode Consistency
+
+Both modes use the **exact same handler function** to ensure identical behavior:
+
+| Feature | Local Mode | Lambda Mode |
+|---------|------------|-------------|
+| **HTTP Responses** | ✅ Identical | ✅ Identical |
+| **Security Headers** | ✅ All applied | ✅ All applied |
+| **Input Validation** | ✅ Same rules | ✅ Same rules |
+| **Error Handling** | ✅ Same responses | ✅ Same responses |
+| **Logging Format** | ✅ Structured | ✅ Structured |
+| **Content Served** | ✅ Same HTML | ✅ Same HTML |
+
+### 🛠️ Development Workflow
+
+**Recommended development workflow:**
+
+1. **Develop Locally**:
+   ```bash
+   # Start local server with logging
+   RUST_LOG=info ./target/debug/static-web-lambda --mode local --port 3000
+   
+   # Test in browser
+   open http://localhost:3000
+   
+   # Test with curl (watch logs in terminal)
+   curl -v http://localhost:3000/
+   ```
+
+2. **Test Security Features**:
+   ```bash
+   # Test method validation
+   curl -X POST http://localhost:3000/  # Should return 405
+   
+   # Test security headers
+   curl -I http://localhost:3000/  # Check headers
+   
+   # Test path independence
+   curl http://localhost:3000/any/path  # Same content
+   ```
+
+3. **Run Test Suite**:
+   ```bash
+   cargo test  # Verify all tests pass
+   ```
+
+4. **Deploy to Lambda**:
+   ```bash
+   # Build for Lambda
+   cargo build --release --target x86_64-unknown-linux-gnu
+   
+   # Package and deploy (see Deployment section)
+   ```
+
+### 📋 Command-Line Options
+
+```bash
+# Show all available options
+./target/debug/static-web-lambda --help
+
+# Available options:
+#   -m, --mode <MODE>     Execution mode: 'lambda' or 'local' [default: lambda]
+#   -p, --port <PORT>     Port for local server [default: 3000]
+#   -H, --host <HOST>     Host for local server [default: 127.0.0.1]
+#   -h, --help           Print help information
+#   -V, --version        Print version information
+```
+
+### 🚨 Important Notes
+
+- **Lambda Mode**: Only works when deployed to AWS Lambda with proper environment variables
+- **Local Mode**: Only for development - not suitable for production traffic
+- **Port Conflicts**: Ensure the chosen port is not in use by other services
+- **Security**: Local mode defaults to localhost (127.0.0.1) for security
+- **Consistency**: Both modes produce identical HTTP responses and behavior
+
 ## 🧪 Testing
 
 This project includes comprehensive testing with both unit tests and property-based tests.
@@ -117,6 +251,61 @@ make clean
 
 # Run Lambda function locally (will timeout after 5s)
 make run
+```
+
+### Manual Execution Commands
+
+```bash
+# Build the project
+cargo build
+
+# Run in local development mode (with default log level)
+./target/debug/static-web-lambda --mode local
+
+# Run in local mode with info-level logging
+RUST_LOG=info ./target/debug/static-web-lambda --mode local
+
+# Run in local mode with debug-level logging (very verbose)
+RUST_LOG=debug ./target/debug/static-web-lambda --mode local
+
+# Run in local mode with custom settings and logging
+RUST_LOG=info ./target/debug/static-web-lambda --mode local --host 0.0.0.0 --port 8080
+
+# Run in Lambda mode (requires AWS Lambda environment)
+./target/debug/static-web-lambda --mode lambda
+
+# Show help and all options
+./target/debug/static-web-lambda --help
+```
+
+### 📝 Logging Configuration
+
+The application uses structured logging that outputs to **stdout** for better visibility:
+
+```bash
+# Set log level using RUST_LOG environment variable
+export RUST_LOG=info    # Show info, warn, and error messages
+export RUST_LOG=debug   # Show all messages (very verbose)
+export RUST_LOG=warn    # Show only warnings and errors
+export RUST_LOG=error   # Show only errors (default)
+
+# Run with specific log level
+RUST_LOG=info ./target/debug/static-web-lambda --mode local
+```
+
+**Log Levels Available:**
+- `error` - Only error messages (default)
+- `warn` - Warnings and errors
+- `info` - Info, warnings, and errors (recommended for development)
+- `debug` - All messages including debug info (very verbose)
+- `trace` - Maximum verbosity (includes internal library logs)
+
+**Example Log Output:**
+```
+[2025-12-26T13:24:00Z INFO  static_web_lambda] Starting static-web-lambda in Local mode
+[2025-12-26T13:24:00Z INFO  static_web_lambda] Local development server running at http://127.0.0.1:3000
+[2025-12-26T13:24:25Z INFO  static_web_lambda::handler] [REQUEST] method=GET path=/ user_agent=curl/8.7.1
+[2025-12-26T13:24:25Z INFO  static_web_lambda::handler] [RESPONSE] status=200 processing_time_ms=0 path=/
 ```
 
 ## 🏗️ Building for AWS Lambda
@@ -213,9 +402,10 @@ docker run --rm -v "$PWD":/usr/src/myapp -w /usr/src/myapp rust:1.70 cargo build
 - `lambda_http` - HTTP event handling for Lambda
 - `tokio` - Async runtime
 - `serde_json` - JSON serialization
-- `hyper` - HTTP library
+- `hyper` - HTTP library (used for local development server)
 - `log` & `env_logger` - Logging
 - `chrono` - Date/time handling
+- `clap` - Command-line argument parsing (enables execution modes)
 
 ### Development Dependencies
 - `proptest` - Property-based testing framework
