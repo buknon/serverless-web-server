@@ -154,7 +154,10 @@ async fn main() -> Result<(), Error> {
     // 
     // AWS Lambda automatically captures stdout/stderr and sends them to CloudWatch Logs
     // For local development, logs will appear in the terminal
-    // env_logger outputs to stderr by default, which works well for both modes
+    // 
+    // Modified to output to stdout instead of stderr for better visibility
+    // This is especially useful for local development where you want to see logs
+    // in the same stream as other output
     // 
     // Log level configuration:
     // - In Lambda: Set RUST_LOG environment variable (e.g., RUST_LOG=info)
@@ -165,7 +168,9 @@ async fn main() -> Result<(), Error> {
     // - Proper log levels (error, warn, info, debug, trace)
     // - Easy parsing by log aggregation tools
     // - Better debugging and monitoring capabilities
-    env_logger::init();
+    env_logger::Builder::from_default_env()
+        .target(env_logger::Target::Stdout)  // Output to stdout instead of stderr
+        .init();
     
     // Log the execution mode for debugging and monitoring
     info!("Starting static-web-lambda in {:?} mode", args.mode);
@@ -301,15 +306,119 @@ fn is_lambda_environment() -> bool {
 /// - Integration testing with other local services
 /// - Demonstrating functionality without AWS account
 async fn run_local_mode(host: String, port: u16) -> Result<(), Error> {
-    // For now, we'll just log that local mode would start here
-    // The actual local server implementation will be added in a future task
-    info!("Local mode requested on {}:{}", host, port);
-    info!("Local server implementation will be added in task 34");
-    info!("This is the recommended mode for local development and testing");
+    use hyper::service::{make_service_fn, service_fn};
+    use hyper::Server;
+    use std::convert::Infallible;
+    use std::net::SocketAddr;
     
-    // Return an error to indicate that local mode is not yet implemented
-    // This provides clear feedback to users who try to use local mode
-    Err(Error::from("Local mode not yet implemented. Implementation coming in task 34."))
+    info!("Starting local development server on {}:{}", host, port);
+    
+    // Parse the host and port into a socket address
+    let addr: SocketAddr = format!("{}:{}", host, port)
+        .parse()
+        .map_err(|e| Error::from(format!("Invalid host:port combination: {}", e)))?;
+    
+    // Create a service that converts hyper requests to lambda_http requests
+    // and calls our Lambda handler function
+    let make_svc = make_service_fn(|_conn| {
+        async {
+            Ok::<_, Infallible>(service_fn(|req: hyper::Request<hyper::Body>| {
+                async move {
+                    // Convert hyper request to lambda_http request
+                    let lambda_request = convert_hyper_to_lambda_request(req).await?;
+                    
+                    // Call our Lambda handler function (same as used in Lambda mode)
+                    let lambda_response = function_handler(lambda_request).await?;
+                    
+                    // Convert lambda_http response back to hyper response
+                    let hyper_response = convert_lambda_to_hyper_response(lambda_response).await?;
+                    
+                    Ok::<_, Error>(hyper_response)
+                }
+            }))
+        }
+    });
+    
+    // Create and start the HTTP server
+    let server = Server::bind(&addr).serve(make_svc);
+    
+    info!("Local development server running at http://{}", addr);
+    info!("Press Ctrl+C to stop the server");
+    
+    // Run the server and handle any errors
+    if let Err(e) = server.await {
+        error!("Local server error: {}", e);
+        return Err(Error::from(format!("Local server failed: {}", e)));
+    }
+    
+    Ok(())
+}
+
+/// Convert a hyper HTTP request to a lambda_http request
+/// 
+/// This function bridges the gap between the local hyper server and the Lambda handler.
+/// It ensures that the same handler function can process requests in both environments.
+async fn convert_hyper_to_lambda_request(req: hyper::Request<hyper::Body>) -> Result<lambda_http::Request, Error> {
+    use lambda_http::http;
+    
+    // Extract the parts of the hyper request
+    let (parts, body) = req.into_parts();
+    
+    // Convert the body to bytes
+    let body_bytes = hyper::body::to_bytes(body).await
+        .map_err(|e| Error::from(format!("Failed to read request body: {}", e)))?;
+    
+    // Create a lambda_http request with the same data
+    let lambda_body = if body_bytes.is_empty() {
+        lambda_http::Body::Empty
+    } else {
+        lambda_http::Body::Binary(body_bytes.to_vec())
+    };
+    
+    // Build the lambda_http request
+    let lambda_request = http::Request::builder()
+        .method(parts.method)
+        .uri(parts.uri)
+        .version(parts.version)
+        .body(lambda_body)
+        .map_err(|e| Error::from(format!("Failed to build lambda request: {}", e)))?;
+    
+    // Copy headers from hyper request to lambda request
+    let mut lambda_request = lambda_request;
+    *lambda_request.headers_mut() = parts.headers;
+    
+    Ok(lambda_request)
+}
+
+/// Convert a lambda_http response to a hyper HTTP response
+/// 
+/// This function converts the response from our Lambda handler back to a format
+/// that the local hyper server can send to the client.
+async fn convert_lambda_to_hyper_response(resp: lambda_http::Response<lambda_http::Body>) -> Result<hyper::Response<hyper::Body>, Error> {
+    use hyper::http::StatusCode;
+    
+    // Extract the parts of the lambda response
+    let (parts, lambda_body) = resp.into_parts();
+    
+    // Convert lambda_http body to hyper body
+    let hyper_body = match lambda_body {
+        lambda_http::Body::Empty => hyper::Body::empty(),
+        lambda_http::Body::Text(text) => hyper::Body::from(text),
+        lambda_http::Body::Binary(bytes) => hyper::Body::from(bytes),
+    };
+    
+    // Build the hyper response
+    let mut hyper_response = hyper::Response::builder()
+        .status(StatusCode::from_u16(parts.status.as_u16())
+            .map_err(|e| Error::from(format!("Invalid status code: {}", e)))?)
+        .version(parts.version)
+        .body(hyper_body)
+        .map_err(|e| Error::from(format!("Failed to build hyper response: {}", e)))?;
+    
+    // Copy headers from lambda response to hyper response
+    *hyper_response.headers_mut() = parts.headers;
+    
+    Ok(hyper_response)
 }
 
 // This section contains unit tests for our Lambda function

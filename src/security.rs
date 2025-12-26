@@ -3,6 +3,7 @@
 
 use std::path::Path;
 use std::fmt;
+use log::{info, warn};
 
 /// Security error types for different security violation scenarios
 /// 
@@ -307,7 +308,7 @@ impl fmt::Display for SecurityError {
 pub fn sanitize_path(path: &str) -> Result<String, SecurityError> {
     // Log the original path for security monitoring
     // This helps detect attack attempts and patterns
-    println!("Sanitizing request path: {}", path);
+    info!("Sanitizing request path: {}", path);
     
     // Check for excessively long paths that could indicate DoS attempts
     // Long paths can consume memory and processing time
@@ -317,7 +318,7 @@ pub fn sanitize_path(path: &str) -> Result<String, SecurityError> {
             path: path.to_string(),
             reason: format!("Path too long: {} characters (max: {})", path.len(), MAX_PATH_LENGTH),
         };
-        println!("Security violation: {}", error.to_detailed_message());
+        warn!("Security violation: {}", error.to_detailed_message());
         return Err(error);
     }
     
@@ -328,7 +329,7 @@ pub fn sanitize_path(path: &str) -> Result<String, SecurityError> {
             field: "request_path".to_string(),
             details: "Path contains null byte".to_string(),
         };
-        println!("Security violation: {}", error.to_detailed_message());
+        warn!("Security violation: {}", error.to_detailed_message());
         return Err(error);
     }
     
@@ -345,7 +346,7 @@ pub fn sanitize_path(path: &str) -> Result<String, SecurityError> {
                     path: path.to_string(),
                     reason: "Path contains parent directory reference (..)".to_string(),
                 };
-                println!("Security violation: {}", error.to_detailed_message());
+                warn!("Security violation: {}", error.to_detailed_message());
                 return Err(error);
             }
             // "." components are generally harmless but we'll be strict
@@ -355,7 +356,7 @@ pub fn sanitize_path(path: &str) -> Result<String, SecurityError> {
                     path: path.to_string(),
                     reason: "Path contains current directory reference (.)".to_string(),
                 };
-                println!("Security violation: {}", error.to_detailed_message());
+                warn!("Security violation: {}", error.to_detailed_message());
                 return Err(error);
             }
             // Normal path components are fine, but we'll validate the content
@@ -368,7 +369,7 @@ pub fn sanitize_path(path: &str) -> Result<String, SecurityError> {
                             field: "path_component".to_string(),
                             details: "Path contains invalid UTF-8 characters".to_string(),
                         };
-                        println!("Security violation: {}", error.to_detailed_message());
+                        warn!("Security violation: {}", error.to_detailed_message());
                         return Err(error);
                     }
                 };
@@ -382,7 +383,7 @@ pub fn sanitize_path(path: &str) -> Result<String, SecurityError> {
                             field: "path_component".to_string(),
                             details: format!("Path contains dangerous character: {}", dangerous_char),
                         };
-                        println!("Security violation: {}", error.to_detailed_message());
+                        warn!("Security violation: {}", error.to_detailed_message());
                         return Err(error);
                     }
                 }
@@ -406,7 +407,7 @@ pub fn sanitize_path(path: &str) -> Result<String, SecurityError> {
                             path: path.to_string(),
                             reason: format!("Path contains encoded traversal pattern: {}", pattern),
                         };
-                        println!("Security violation: {}", error.to_detailed_message());
+                        warn!("Security violation: {}", error.to_detailed_message());
                         return Err(error);
                     }
                 }
@@ -422,7 +423,7 @@ pub fn sanitize_path(path: &str) -> Result<String, SecurityError> {
                     path: path.to_string(),
                     reason: "Path contains Windows-style prefix".to_string(),
                 };
-                println!("Security violation: {}", error.to_detailed_message());
+                warn!("Security violation: {}", error.to_detailed_message());
                 return Err(error);
             }
         }
@@ -433,7 +434,7 @@ pub fn sanitize_path(path: &str) -> Result<String, SecurityError> {
     // We could normalize it further, but for our static server, the original is fine
     let sanitized = path.to_string();
     
-    println!("Path sanitization successful: {} -> {}", path, sanitized);
+    info!("Path sanitization successful: {} -> {}", path, sanitized);
     Ok(sanitized)
 }
 
@@ -499,12 +500,12 @@ pub fn validate_request_size(request: &lambda_http::Request) -> Result<(), Secur
             max_size: MAX_REQUEST_SIZE,
             path: request_path,
         };
-        println!("Security violation: {}", error.to_detailed_message());
+        warn!("Security violation: {}", error.to_detailed_message());
         return Err(error);
     }
     
     // Log successful size validation for debugging
-    println!(
+    info!(
         "Request size validation successful: {} bytes (limit: {} bytes)", 
         total_size, 
         MAX_REQUEST_SIZE
@@ -539,7 +540,7 @@ pub fn validate_http_method(method: &str) -> Result<(), SecurityError> {
             method: method.to_string(),
             path: "unknown".to_string(), // Path will be provided by caller if needed
         };
-        println!("Security violation: {}", error.to_detailed_message());
+        warn!("Security violation: {}", error.to_detailed_message());
         return Err(error);
     }
     
