@@ -147,7 +147,6 @@ clean_build() {
 build_docker() {
     log_info "Building using Docker..."
     
-    local docker_image="${DOCKER_IMAGE:-rust:1.83}"
     local target_arch="${TARGET_ARCH:-x86_64-unknown-linux-gnu}"
     local cargo_flags="${CARGO_FLAGS:-}"
     
@@ -162,23 +161,27 @@ build_docker() {
         return 1
     fi
     
-    log_info "Using Docker image: $docker_image"
+    log_info "Using custom Dockerfile.build for AWS Lambda compatibility"
     log_info "Target architecture: $target_arch"
     
-    # Create build command with Cargo.lock handling
-    local build_cmd="rustup target add $target_arch && (cargo build --release --target $target_arch $cargo_flags || (echo 'Regenerating Cargo.lock due to version mismatch...' && rm -f Cargo.lock && cargo build --release --target $target_arch $cargo_flags))"
+    # Build the Docker image from our custom Dockerfile
+    log_info "Building Docker image..."
+    if ! docker build -f Dockerfile.build -t lambda-rust-builder .; then
+        log_error "Failed to build Docker image"
+        return 1
+    fi
     
-    # Run Docker build with explicit platform
+    # Run the build using our custom image
+    log_info "Running build in Docker container..."
     if docker run --rm --platform linux/amd64 \
         -v "$PWD":/usr/src/app \
         -w /usr/src/app \
-        "$docker_image" \
-        bash -c "$build_cmd"; then
+        lambda-rust-builder; then
         
         log_success "Docker build completed successfully."
         
-        # Copy the binary to expected location
-        local binary_path="$TARGET_DIR/$target_arch/release/$PROJECT_NAME"
+        # Copy the binary to expected location for compatibility
+        local binary_path="$TARGET_DIR/release/$PROJECT_NAME"
         if [[ -f "$binary_path" ]]; then
             log_info "Binary built at: $binary_path"
             return 0

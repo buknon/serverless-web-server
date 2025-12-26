@@ -246,7 +246,7 @@ This implementation plan breaks down the static web Lambda project into small, d
   - Restrict to GET methods only
   - _Requirements: 3.4_
 
-- [ ] 48. Add Terraform outputs
+- [x] 48. Add Terraform outputs
   - Output the public Function URL for easy access
   - Add other useful outputs (function name, log group)
   - _Requirements: 3.3_
@@ -303,6 +303,12 @@ This implementation plan breaks down the static web Lambda project into small, d
 
 - [ ] 59. Final checkpoint - Complete system validation
   - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 60. Fix GLIBC compatibility issue
+  - Rebuild Lambda function using Docker-based cross-compilation to ensure compatibility with AWS Lambda runtime
+  - Verify the bootstrap binary is built for x86_64-unknown-linux-gnu target
+  - Test deployment to ensure GLIBC version compatibility
+  - _Requirements: 6.1, 6.2_
 
 ## Notes
 
