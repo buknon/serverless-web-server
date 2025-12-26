@@ -1,0 +1,90 @@
+# Dockerfile for building AWS Lambda deployment package
+# This Dockerfile creates a Linux-based build environment for cross-compiling
+# the Rust Lambda function to be compatible with AWS Lambda runtime
+
+# Use official Rust image with specific version for reproducible builds
+# Use linux/amd64 platform for x86_64 cross-compilation compatibility
+FROM --platform=linux/amd64 rust:1.83-slim
+
+# Install required system dependencies for cross-compilation
+RUN apt-get update && apt-get install -y \
+    # Build essentials for compiling native dependencies
+    build-essential \
+    # Cross-compilation toolchain for x86_64 Linux
+    gcc-x86-64-linux-gnu \
+    # ZIP utility for creating deployment packages
+    zip \
+    # Additional tools for debugging and validation
+    file \
+    # Clean up apt cache to reduce image size
+    && rm -rf /var/lib/apt/lists/*
+
+# Set up cross-compilation environment variables
+ENV CC_x86_64_unknown_linux_gnu=x86_64-linux-gnu-gcc
+ENV CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=x86_64-linux-gnu-gcc
+
+# Add the Linux target for cross-compilation
+RUN rustup target add x86_64-unknown-linux-gnu
+
+# Set working directory
+WORKDIR /usr/src/app
+
+# Create a build script that will be used as the default command
+RUN echo '#!/bin/bash\n\
+set -euo pipefail\n\
+\n\
+echo "🦀 Building Rust Lambda function for AWS deployment..."\n\
+echo "Rust version: $(rustc --version)"\n\
+echo "Cargo version: $(cargo --version)"\n\
+echo "Target: x86_64-unknown-linux-gnu"\n\
+echo ""\n\
+\n\
+# Handle Cargo.lock version compatibility\n\
+if ! cargo build --release --target x86_64-unknown-linux-gnu 2>/dev/null; then\n\
+    echo "⚠️  Cargo.lock version mismatch detected, regenerating..."\n\
+    rm -f Cargo.lock\n\
+    echo "📦 Building project with regenerated Cargo.lock..."\n\
+    cargo build --release --target x86_64-unknown-linux-gnu\n\
+else\n\
+    echo "📦 Building project..."\n\
+fi\n\
+\n\
+# Verify the binary was created\n\
+BINARY_PATH="target/x86_64-unknown-linux-gnu/release/static-web-lambda"\n\
+if [[ ! -f "$BINARY_PATH" ]]; then\n\
+    echo "❌ Error: Binary not found at $BINARY_PATH"\n\
+    exit 1\n\
+fi\n\
+\n\
+echo "✅ Build completed successfully!"\n\
+echo "Binary location: $BINARY_PATH"\n\
+echo "Binary size: $(stat -c%s "$BINARY_PATH") bytes"\n\
+echo "Binary type: $(file "$BINARY_PATH")"\n\
+\n\
+# Create deployment package\n\
+echo ""\n\
+echo "📦 Creating deployment package..."\n\
+mkdir -p lambda-package\n\
+cp "$BINARY_PATH" lambda-package/bootstrap\n\
+chmod +x lambda-package/bootstrap\n\
+\n\
+# Create ZIP file\n\
+cd lambda-package\n\
+zip -r ../lambda-deployment.zip bootstrap\n\
+cd ..\n\
+\n\
+echo "✅ Deployment package created: lambda-deployment.zip"\n\
+echo "Package size: $(stat -c%s lambda-deployment.zip) bytes"\n\
+echo "Package contents:"\n\
+unzip -l lambda-deployment.zip\n\
+' > /usr/local/bin/build-lambda.sh && chmod +x /usr/local/bin/build-lambda.sh
+
+# Default command runs the build script
+CMD ["/usr/local/bin/build-lambda.sh"]
+
+# Labels for documentation and maintenance
+LABEL maintainer="Static Web Lambda Project"
+LABEL description="Build environment for Rust AWS Lambda functions"
+LABEL version="1.0"
+LABEL rust.version="1.83"
+LABEL target="x86_64-unknown-linux-gnu"

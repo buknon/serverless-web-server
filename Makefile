@@ -1,20 +1,28 @@
 # Makefile for Static Web Lambda project
 # This provides convenient commands for development and testing
 
-.PHONY: help build test test-html run clean check
+.PHONY: help build test test-html run clean check build-lambda build-docker build-local deploy-package
 
 # Default target - show help
 help:
 	@echo "🦀 Static Web Lambda - Available Commands:"
 	@echo "=========================================="
-	@echo "  make build      - Build the project"
+	@echo "Development Commands:"
+	@echo "  make build      - Build the project locally"
 	@echo "  make test       - Run all tests"
 	@echo "  make test-html  - Test HTML content specifically"
 	@echo "  make run        - Run the Lambda function locally (will start and stop)"
 	@echo "  make check      - Check code without building"
 	@echo "  make clean      - Clean build artifacts"
 	@echo ""
+	@echo "Deployment Commands:"
+	@echo "  make build-lambda    - Interactive deployment build menu"
+	@echo "  make build-docker    - Build Lambda package using Docker"
+	@echo "  make build-local     - Build Lambda package using local cross-compilation"
+	@echo "  make deploy-package  - Create deployment package from existing binary"
+	@echo ""
 	@echo "🧪 After making changes, run: make test-html"
+	@echo "🚀 For deployment, run: make build-lambda"
 
 # Build the project
 build:
@@ -47,3 +55,25 @@ check:
 clean:
 	@echo "🧹 Cleaning build artifacts..."
 	cargo clean
+
+# Deployment build commands
+
+# Interactive deployment build menu
+build-lambda:
+	@echo "🚀 Starting interactive deployment build..."
+	@./scripts/build-deploy.sh
+
+# Build Lambda package using Docker (recommended)
+build-docker:
+	@echo "🐳 Building Lambda package using Docker..."
+	@./scripts/build-lambda.sh docker
+
+# Build Lambda package using local cross-compilation
+build-local:
+	@echo "🔧 Building Lambda package using local cross-compilation..."
+	@./scripts/build-lambda.sh local
+
+# Create deployment package from existing binary
+deploy-package:
+	@echo "📦 Creating deployment package..."
+	@./scripts/build-lambda.sh --package-only
