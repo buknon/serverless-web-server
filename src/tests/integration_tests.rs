@@ -370,10 +370,11 @@ async fn test_error_response_bodies() {
     let body_content = String::from_utf8(body_bytes.to_vec())
         .expect("Response body should be valid UTF-8");
     
-    assert_eq!(
-        body_content, 
-        "Method Not Allowed. This server only supports GET requests.",
-        "Method not allowed error message should be clear and informative"
+    assert!(
+        body_content.starts_with("Method Not Allowed. This server only supports GET requests.") &&
+        body_content.contains("(Request ID: "),
+        "Method not allowed error message should be clear and informative with request ID. Got: {}",
+        body_content
     );
     
     // Test malicious path error message
@@ -391,9 +392,10 @@ async fn test_error_response_bodies() {
     let body_content = String::from_utf8(body_bytes.to_vec())
         .expect("Response body should be valid UTF-8");
     
-    assert_eq!(
-        body_content, 
-        "Bad Request. Invalid request path.",
-        "Malicious path error message should be generic and not leak security details"
+    assert!(
+        body_content.starts_with("Bad Request. Invalid request path.") &&
+        body_content.contains("(Request ID: "),
+        "Malicious path error message should be generic and not leak security details, with request ID. Got: {}",
+        body_content
     );
 }

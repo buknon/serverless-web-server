@@ -4,6 +4,7 @@
 use lambda_http::{Error, Response, Body};
 use log;
 use chrono;
+use std::env;
 
 /// Static HTML content served by our Lambda function
 /// 
@@ -22,6 +23,97 @@ use chrono;
 /// - Easier to maintain and edit HTML content
 /// - Still gets all the performance benefits of compile-time inclusion
 const HTML_CONTENT: &str = include_str!("index.html");
+
+/// Generates or extracts a request ID for error correlation and logging
+/// 
+/// This function implements request ID generation for error correlation as required by
+/// Requirements 5.4: "Include request ID for error correlation"
+/// 
+/// ## Request ID Sources (in order of preference):
+/// 
+/// 1. **AWS Lambda Request ID**: AWS Lambda automatically provides a unique request ID
+///    for each invocation via the `AWS_LAMBDA_LOG_STREAM_NAME` and `_X_AMZN_TRACE_ID`
+///    environment variables. This is the preferred source as it integrates with AWS
+///    CloudWatch and X-Ray tracing.
+/// 
+/// 2. **Generated UUID**: If AWS Lambda environment variables are not available
+///    (e.g., during local testing), we generate a random UUID for request tracking.
+/// 
+/// ## Request ID Format:
+/// 
+/// - **AWS Lambda**: Uses the format provided by AWS (typically UUID-like)
+/// - **Generated**: Uses a simple timestamp-based format for local development
+/// 
+/// ## Use Cases:
+/// 
+/// - **Error Correlation**: Link error logs with specific requests for debugging
+/// - **Distributed Tracing**: Integrate with AWS X-Ray and CloudWatch for request tracking
+/// - **Security Monitoring**: Track security violations across multiple log entries
+/// - **Performance Analysis**: Correlate request processing times with specific requests
+/// - **Incident Response**: Quickly identify all log entries related to a problematic request
+/// 
+/// ## Security Considerations:
+/// 
+/// - Request IDs are safe to include in user-facing error messages
+/// - They don't reveal sensitive information about the system or request
+/// - They provide a way for users to reference specific errors when reporting issues
+/// - They enable security teams to correlate attacks across multiple requests
+/// 
+/// ## Implementation Notes:
+/// 
+/// - This function is called once per request to ensure consistent request ID usage
+/// - The request ID is included in both detailed error logs and generic user messages
+/// - AWS Lambda request IDs are automatically correlated with CloudWatch logs
+/// - Generated request IDs are useful for local development and testing
+/// 
+/// ## Return Value:
+/// 
+/// Returns a string containing a unique request identifier that can be safely
+/// included in both logs and user-facing error messages.
+fn generate_request_id() -> String {
+    // Try to get AWS Lambda request ID from environment variables
+    // AWS Lambda provides several environment variables that can be used for request correlation:
+    // - AWS_LAMBDA_LOG_STREAM_NAME: Contains the log stream name which includes request info
+    // - _X_AMZN_TRACE_ID: Contains AWS X-Ray trace ID for distributed tracing
+    // - AWS_LAMBDA_REQUEST_ID: Direct request ID (if available in newer Lambda runtimes)
+    
+    // First, try to get the X-Ray trace ID which is most useful for correlation
+    if let Ok(trace_id) = env::var("_X_AMZN_TRACE_ID") {
+        // Extract just the trace ID portion (before any additional metadata)
+        // X-Ray trace IDs have the format: Root=1-5e1b4151-5ac6c58f5b5dcc1e1e0a7e1c;Parent=...;Sampled=...
+        if let Some(root_part) = trace_id.split(';').next() {
+            if let Some(trace_part) = root_part.strip_prefix("Root=") {
+                return format!("trace-{}", trace_part);
+            }
+        }
+        // If parsing fails, use the full trace ID (truncated for readability)
+        return format!("trace-{}", &trace_id[..std::cmp::min(trace_id.len(), 32)]);
+    }
+    
+    // Try to get AWS Lambda request ID directly (newer runtimes)
+    if let Ok(request_id) = env::var("AWS_LAMBDA_REQUEST_ID") {
+        return format!("lambda-{}", request_id);
+    }
+    
+    // Try to extract request ID from log stream name
+    // Log stream names typically contain request-specific information
+    if let Ok(log_stream) = env::var("AWS_LAMBDA_LOG_STREAM_NAME") {
+        // Extract the last part of the log stream name which often contains request info
+        if let Some(last_part) = log_stream.split('/').last() {
+            return format!("stream-{}", last_part);
+        }
+    }
+    
+    // Fallback: Generate a timestamp-based request ID for local development
+    // This ensures we always have a request ID even when running outside AWS Lambda
+    let timestamp = chrono::Utc::now();
+    let timestamp_str = timestamp.format("%Y%m%d-%H%M%S-%3f").to_string();
+    
+    // Add a random component to ensure uniqueness even for concurrent requests
+    let random_suffix = timestamp.timestamp_nanos_opt().unwrap_or(0) % 10000;
+    
+    format!("local-{}-{:04}", timestamp_str, random_suffix)
+}
 
 /// Creates an HTTP response with HTML content and proper headers
 /// 
@@ -843,6 +935,34 @@ impl ApplicationError {
             }
         }
     }
+
+    /// Returns the error type name for categorization and alerting
+    /// 
+    /// This method provides a simple string identifier for each error type
+    /// that can be used for log filtering, alerting, and error categorization.
+    /// 
+    /// ## Use Cases:
+    /// 
+    /// - Log filtering and searching (e.g., filter all "Security" errors)
+    /// - Error monitoring and alerting systems
+    /// - Error rate tracking by category
+    /// - Automated incident response based on error type
+    /// - Performance monitoring and SLA tracking
+    /// 
+    /// ## Return Values:
+    /// 
+    /// - "Security": For security-related errors (malicious requests, validation failures)
+    /// - "Internal": For internal server errors (unexpected failures, system errors)
+    /// - "Request": For request processing errors (malformed requests, invalid data)
+    /// - "ServiceUnavailable": For service unavailable errors (temporary failures, rate limiting)
+    pub fn error_type_name(&self) -> &'static str {
+        match self {
+            ApplicationError::Security { .. } => "Security",
+            ApplicationError::InternalError { .. } => "Internal",
+            ApplicationError::RequestError { .. } => "Request",
+            ApplicationError::ServiceUnavailable { .. } => "ServiceUnavailable",
+        }
+    }
 }
 
 /// Creates a generic error response that prevents information disclosure
@@ -916,23 +1036,79 @@ impl ApplicationError {
 /// let response = create_generic_error_response(internal_err)?;
 /// ```
 pub fn create_generic_error_response(error: ApplicationError) -> Result<Response<Body>, Error> {
-    // Log the detailed error information for internal monitoring and debugging
+    // Generate a unique request ID for error correlation (Task 30 - Requirements 5.4)
+    // This enables correlation between user-facing error messages and detailed internal logs
+    let request_id = generate_request_id();
+    
+    // Log the detailed error information for internal monitoring and debugging (Task 30 - Requirements 5.4)
     // This provides full context for developers and security teams while
     // keeping sensitive details away from end users
+    // 
+    // Enhanced logging format includes:
+    // - Timestamp: ISO 8601 format for consistent time representation
+    // - Request ID: Unique identifier for correlating this error with user reports
+    // - HTTP Status Code: The status code that will be returned to the user
+    // - Detailed Error: Full error details including sensitive information for debugging
+    // - Error Type: The specific type of error for categorization and alerting
     log::error!(
-        "[{}] [ERROR] Returning generic error response: status={} detailed_error=\"{}\"",
+        "[{}] [ERROR] [REQUEST_ID:{}] Returning generic error response: status={} error_type=\"{}\" detailed_error=\"{}\"",
         chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ"),
+        request_id,
         error.to_http_status_code(),
+        error.error_type_name(),
         error.to_detailed_message()
     );
+    
+    // Additional structured logging for security monitoring and incident response
+    // This separate log entry makes it easier to filter and alert on specific error types
+    match &error {
+        ApplicationError::Security { security_error, context } => {
+            log::warn!(
+                "[{}] [SECURITY_VIOLATION] [REQUEST_ID:{}] Security error in {}: {} (status={})",
+                chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ"),
+                request_id,
+                context,
+                security_error.to_detailed_message(),
+                security_error.to_http_status_code()
+            );
+        }
+        ApplicationError::InternalError { details, cause } => {
+            log::error!(
+                "[{}] [INTERNAL_ERROR] [REQUEST_ID:{}] Internal system error: {} (cause: {})",
+                chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ"),
+                request_id,
+                details,
+                cause.as_deref().unwrap_or("unknown")
+            );
+        }
+        ApplicationError::RequestError { details, component } => {
+            log::warn!(
+                "[{}] [REQUEST_ERROR] [REQUEST_ID:{}] Invalid request in {}: {}",
+                chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ"),
+                request_id,
+                component,
+                details
+            );
+        }
+        ApplicationError::ServiceUnavailable { reason, retry_after } => {
+            log::warn!(
+                "[{}] [SERVICE_UNAVAILABLE] [REQUEST_ID:{}] Service unavailable: {} (retry_after: {})",
+                chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ"),
+                request_id,
+                reason,
+                retry_after.map(|s| s.to_string()).unwrap_or_else(|| "unknown".to_string())
+            );
+        }
+    }
     
     // Get the appropriate HTTP status code for this error type
     let status_code = error.to_http_status_code();
     
-    // Get the generic, user-safe error message
+    // Get the generic, user-safe error message with request ID for correlation
     // This message is designed to be helpful to legitimate users while
     // not revealing any sensitive information to potential attackers
-    let user_message = error.to_generic_user_message();
+    // The request ID allows users to reference specific errors when reporting issues
+    let user_message = format!("{} (Request ID: {})", error.to_generic_user_message(), request_id);
     
     // Build the error response with consistent security headers
     let mut response_builder = Response::builder()
@@ -957,7 +1133,7 @@ pub fn create_generic_error_response(error: ApplicationError) -> Result<Response
         response_builder = response_builder.header("retry-after", seconds.to_string());
     }
     
-    // Build the final response with the generic user message
+    // Build the final response with the generic user message including request ID
     let response = response_builder
         .body(user_message.into())
         .map_err(Box::new)?;

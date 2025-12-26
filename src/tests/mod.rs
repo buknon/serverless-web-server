@@ -4,3 +4,4 @@
 pub mod unit_tests;
 pub mod integration_tests;
 pub mod property_tests;
+pub mod enhanced_logging_tests;
