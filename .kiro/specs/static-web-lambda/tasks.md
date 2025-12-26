@@ -42,7 +42,7 @@ This implementation plan breaks down the static web Lambda project into small, d
   - Include comments explaining CSS choices for beginners
   - _Requirements: 1.3, 4.1_
 
-- [ ]* 8. Write unit test for HTML content structure
+- [x] 8. Write unit test for HTML content structure
   - Test that HTML content contains required DOCTYPE and meta tags
   - Validate basic HTML structure is well-formed
   - _Requirements: 1.3_
@@ -62,12 +62,12 @@ This implementation plan breaks down the static web Lambda project into small, d
   - Add comments explaining HTTP status codes
   - _Requirements: 1.1_
 
-- [ ] 12. Implement path-independent serving
+- [x] 12. Implement path-independent serving
   - Make handler return same HTML content for any request path
   - Add comments explaining why all paths serve identical content
   - _Requirements: 1.2_
 
-- [ ]* 13. Write property test for path independence
+- [x] 13. Write property test for path independence
   - **Property 2: Path Independence**
   - **Validates: Requirements 1.2**
 
@@ -76,7 +76,7 @@ This implementation plan breaks down the static web Lambda project into small, d
   - Add error handling for runtime startup
   - _Requirements: 1.1, 2.2_
 
-- [ ]* 15. Write property test for HTTP response correctness
+- [x] 15. Write property test for HTTP response correctness
   - **Property 1: HTTP Response Correctness**
   - **Validates: Requirements 1.1, 1.3, 1.4**
 
@@ -133,7 +133,7 @@ This implementation plan breaks down the static web Lambda project into small, d
   - Sanitize logged data to prevent log injection
   - _Requirements: 2.4_
 
-- [ ]* 27. Write property test for request logging
+- [x] 27. Write property test for request logging
   - **Property 4: Request Logging**
   - **Validates: Requirements 2.4**
 
@@ -174,11 +174,11 @@ This implementation plan breaks down the static web Lambda project into small, d
   - Add graceful shutdown handling
   - _Requirements: 5.1_
 
-- [ ] 36. Write property test for local-Lambda consistency
+- [x] 36. Write property test for local-Lambda consistency
   - **Property 5: Local-Lambda Consistency**
   - **Validates: Requirements 5.1, 5.2**
 
-- [ ] 37. Write unit tests for local development features
+- [ ]* 37. Write unit tests for local development features
   - Test local server startup and shutdown
   - Test command-line argument parsing
   - _Requirements: 5.1_
@@ -209,39 +209,39 @@ This implementation plan breaks down the static web Lambda project into small, d
   - Validate deployment package compatibility
   - _Requirements: 6.2_
 
-- [ ] 41.1. Create AWS CodeBuild configuration
+- [x] 41.1. Create AWS CodeBuild configuration
   - Add buildspec.yml for automated Lambda builds in AWS CodeBuild
   - Configure Linux-based build environment for cross-compilation
   - Add build artifact storage in S3 and deployment integration
   - Include build status reporting and error handling
   - _Requirements: 6.1, 6.2_
 
-- [ ] 42. Create Terraform variables file
+- [x] 42. Create Terraform variables file
   - Define variables for function name, region, and other configurable values
   - Add descriptions for each variable
   - _Requirements: 3.1, 4.4_
 
-- [ ] 43. Create IAM role for Lambda
+- [x] 43. Create IAM role for Lambda
   - Define least-privilege IAM role for Lambda execution
   - Add comprehensive comments explaining permissions
   - _Requirements: 3.1, 3.4_
 
-- [ ] 44. Create CloudWatch log group
+- [x] 44. Create CloudWatch log group
   - Define log group for Lambda function logs
   - Set appropriate retention period
   - _Requirements: 3.1_
 
-- [ ] 45. Create Lambda function resource
+- [x] 45. Create Lambda function resource
   - Define Lambda function with proper runtime and handler
   - Reference the ZIP file created by build script
   - _Requirements: 3.1_
 
-- [ ] 46. Create Lambda Function URL
+- [x] 46. Create Lambda Function URL
   - Set up Function URL with HTTPS endpoint
   - Configure public access for static content serving
   - _Requirements: 3.1, 3.3_
 
-- [ ] 47. Configure CORS for Function URL
+- [x] 47. Configure CORS for Function URL
   - Set up CORS configuration for browser compatibility
   - Restrict to GET methods only
   - _Requirements: 3.4_
@@ -251,7 +251,7 @@ This implementation plan breaks down the static web Lambda project into small, d
   - Add other useful outputs (function name, log group)
   - _Requirements: 3.3_
 
-- [ ]* 49. Write integration tests for Terraform
+- [ ] 49. Write integration tests for Terraform
   - Test Terraform plan and apply operations
   - Validate deployed resources and configurations
   - _Requirements: 3.1, 3.2_
