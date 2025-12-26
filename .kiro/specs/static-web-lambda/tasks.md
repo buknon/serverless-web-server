@@ -151,7 +151,7 @@ This implementation plan breaks down the static web Lambda project into small, d
   - Include request ID for error correlation
   - _Requirements: 5.4_
 
-- [-] 31. Write property test for error handling
+- [x] 31. Write property test for error handling
   - **Property 6: Error Handling**
   - **Validates: Requirements 5.4**
 

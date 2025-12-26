@@ -5,3 +5,7 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc 09acf79bb416a2f4b89569d07572d25dd33f7311b81cfdd459d41462b84cc4c6 # shrinks to path = "_", method = "POST", add_malicious_path = false, make_oversized_request = false
+cc 7c82d2b125da8af0540c04b0fc0f4637e0d7a394fdd3dd5c300fccac22bbeaad # shrinks to error_scenario = "oversized_request_body", random_path_suffix = "", random_body_size = 1000
+cc 7c647e01edd9bf61eae95dc45c098e6a8b36bc11a68d69ff144463eb400d31ef # shrinks to security_violation = "directory_traversal", attack_payload = "", path_component = ""
+cc acd78d29ebee394f4edad13ff174ebd67041fa75be5c9b32d47ed5b65e3789de # shrinks to security_violation = "oversized_request", attack_payload = "<", path_component = ""
+cc b3f02737306583ca6e65d08d237fda4280321e48f342160adad8d225b7c543ec # shrinks to security_violation = "directory_traversal", attack_payload = "0", path_component = ""
