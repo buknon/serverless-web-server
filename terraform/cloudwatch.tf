@@ -28,17 +28,8 @@ resource "aws_cloudwatch_log_group" "lambda_logs" {
   })
 }
 
-# Output the log group name for reference by other resources
-output "lambda_log_group_name" {
-  description = "Name of the CloudWatch log group for Lambda function logs"
-  value       = aws_cloudwatch_log_group.lambda_logs.name
-}
-
-# Output the log group ARN for IAM policy references
-output "lambda_log_group_arn" {
-  description = "ARN of the CloudWatch log group for Lambda function logs"
-  value       = aws_cloudwatch_log_group.lambda_logs.arn
-}
+# Note: Outputs have been moved to outputs.tf for centralized management
+# This keeps all outputs in one place for better organization
 
 # Log Management Notes:
 # 1. Log Retention: Configured via variable (default 14 days)

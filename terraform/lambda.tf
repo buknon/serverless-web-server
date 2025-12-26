@@ -129,31 +129,8 @@ resource "aws_lambda_permission" "allow_function_url" {
   function_url_auth_type = "NONE"
 }
 
-# Outputs for other resources and external reference
-output "lambda_function_arn" {
-  description = "ARN of the Lambda function"
-  value       = aws_lambda_function.static_web_lambda.arn
-}
-
-output "lambda_function_name" {
-  description = "Name of the Lambda function"
-  value       = aws_lambda_function.static_web_lambda.function_name
-}
-
-output "lambda_function_invoke_arn" {
-  description = "Invoke ARN of the Lambda function (for API Gateway integration)"
-  value       = aws_lambda_function.static_web_lambda.invoke_arn
-}
-
-output "lambda_function_url" {
-  description = "URL of the Lambda Function URL (if enabled)"
-  value       = var.enable_function_url ? aws_lambda_function_url.static_web_url[0].function_url : null
-}
-
-output "lambda_function_url_id" {
-  description = "ID of the Lambda Function URL (if enabled)"
-  value       = var.enable_function_url ? aws_lambda_function_url.static_web_url[0].url_id : null
-}
+# Note: Outputs have been moved to outputs.tf for centralized management
+# This keeps all outputs in one place for better organization
 
 # Lambda Function Configuration Notes:
 # 1. Runtime: provided.al2 for custom Rust binaries
