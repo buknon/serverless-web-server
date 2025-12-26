@@ -1,34 +1,6 @@
-# Cargo configuration for AWS Lambda cross-compilation
-# This file configures build settings for different target architectures
+# Cargo configuration for local development
+# This file configures build settings for the project
 
-# x86_64 Linux target configuration (Intel/AMD processors)
-# AWS Lambda's traditional runtime architecture - widely supported and compatible
-[target.x86_64-unknown-linux-gnu]
-# Linker configuration for cross-compilation to x86_64 Linux
-# When building on macOS or other non-Linux systems, this ensures proper linking
-# Note: Requires cross-compilation toolchain to be installed
-linker = "x86_64-linux-gnu-gcc"
-
-# ARM64 Linux target configuration (Graviton processors)
-# AWS Lambda Graviton provides better price-performance than x86_64
-# This target is optional but recommended for cost optimization
-[target.aarch64-unknown-linux-gnu]
-# Linker configuration for cross-compilation to ARM64 Linux
-# When building on non-ARM systems, this ensures proper linking for Graviton
-# Note: Requires cross-compilation toolchain to be installed
-linker = "aarch64-linux-gnu-gcc"
-
-# Build configuration
+# Build configuration for local development
 [build]
-# Default target for AWS Lambda deployment
-# x86_64-unknown-linux-gnu is the most widely supported Lambda architecture
-# Change this to aarch64-unknown-linux-gnu if you prefer Graviton (ARM64)
-# target = "x86_64-unknown-linux-gnu"  # Uncomment to set as default build target
-
-# Environment variables for cross-compilation
-[env]
-# These environment variables help with cross-compilation when building for Lambda
-# CC_x86_64_unknown_linux_gnu = "x86_64-linux-gnu-gcc"
-# CXX_x86_64_unknown_linux_gnu = "x86_64-linux-gnu-g++"
-# AR_x86_64_unknown_linux_gnu = "x86_64-linux-gnu-ar"
-# CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER = "x86_64-linux-gnu-gcc"
+# Use default target for local development and testing

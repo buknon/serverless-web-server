@@ -21,9 +21,10 @@ This implementation plan breaks down the static web Lambda project into small, d
   - Add comments explaining why these dependencies are needed
   - _Requirements: 6.1_
 
-- [x] 4. Configure cross-compilation target
-  - Set up Rust toolchain for `x86_64-unknown-linux-gnu` target
-  - Add build configuration for AWS Lambda compatibility
+- [x] 4. Configure cross-compilation target (REMOVED)
+  - Cross-compilation setup has been removed due to compatibility issues
+  - Project now uses native compilation for local development
+  - Lambda deployment will use CI/CD or Docker-based builds
   - _Requirements: 6.1_
 
 - [x] 5. Create basic main.rs skeleton
@@ -155,7 +156,7 @@ This implementation plan breaks down the static web Lambda project into small, d
   - **Property 6: Error Handling**
   - **Validates: Requirements 5.4**
 
-- [ ] 32. Checkpoint - Core functionality complete
+- [x] 32. Checkpoint - Core functionality complete
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 33. Add command-line argument parsing
@@ -182,14 +183,18 @@ This implementation plan breaks down the static web Lambda project into small, d
   - Test command-line argument parsing
   - _Requirements: 5.1_
 
-- [ ] 38. Create basic build script
-  - Write shell script to cross-compile Rust code for Lambda
-  - Add error handling and progress output
+- [ ] 38. Create deployment build management
+  - Create build script that handles native compilation and deployment preparation
+  - Add Docker-based cross-compilation option for Lambda compatibility
+  - Include build validation and error handling
+  - Document deployment build options (AWS CodeBuild, Docker, local builds)
   - _Requirements: 6.1, 6.2_
 
-- [ ] 39. Add bootstrap executable creation
+- [ ] 39. Add Docker-based Lambda build
+  - Create Dockerfile for cross-compilation to Linux
+  - Add script to build Lambda-compatible binary using Docker
   - Rename compiled binary to `bootstrap` (required by Lambda)
-  - Add executable permissions
+  - Add executable permissions and validation
   - _Requirements: 6.2_
 
 - [ ] 40. Implement ZIP packaging
@@ -197,10 +202,19 @@ This implementation plan breaks down the static web Lambda project into small, d
   - Validate ZIP file structure
   - _Requirements: 6.2_
 
-- [ ]* 41. Write unit tests for build process
-  - Test build script execution and output validation
-  - Verify ZIP file structure and contents
+- [ ]* 41. Write unit tests for deployment build process
+  - Test Docker-based build script execution and output validation
+  - Verify bootstrap executable creation and permissions
+  - Test ZIP file structure and contents
+  - Validate deployment package compatibility
   - _Requirements: 6.2_
+
+- [ ] 41.1. Create AWS CodeBuild configuration
+  - Add buildspec.yml for automated Lambda builds in AWS CodeBuild
+  - Configure Linux-based build environment for cross-compilation
+  - Add build artifact storage in S3 and deployment integration
+  - Include build status reporting and error handling
+  - _Requirements: 6.1, 6.2_
 
 - [ ] 42. Create Terraform variables file
   - Define variables for function name, region, and other configurable values
