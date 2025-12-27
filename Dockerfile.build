@@ -1,11 +1,14 @@
-# Dockerfile for building AWS Lambda deployment package
-# This Dockerfile uses the same base image as AWS Lambda runtime to ensure
-# complete compatibility and avoid glibc version mismatches
+# Multi-stage Dockerfile for optimized AWS Lambda Rust builds
+# This Dockerfile implements layer caching optimization to avoid rebuilding
+# the entire environment on every source code change
 
-# Use Amazon Linux 2 base image - same as AWS Lambda runtime environment
-FROM --platform=linux/amd64 amazonlinux:2
+# =============================================================================
+# Stage 1: Base - Install Rust toolchain and system dependencies
+# This stage is cached until the base image or system dependencies change
+# =============================================================================
+FROM --platform=linux/amd64 amazonlinux:2 AS base
 
-# Install Rust and required system dependencies
+# Install system dependencies required for Rust compilation
 RUN yum update -y && yum install -y \
     # Development tools for building Rust projects
     gcc \
@@ -27,22 +30,109 @@ RUN yum update -y && yum install -y \
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.83.0
 ENV PATH="/root/.cargo/bin:${PATH}"
 
-# Verify Rust installation and add target (native compilation, no cross-compilation needed)
+# Verify Rust installation
 RUN rustc --version && cargo --version
+
+# Set working directory for all subsequent stages
+WORKDIR /usr/src/app
+
+# =============================================================================
+# Stage 2: Dependencies - Build project dependencies only
+# This stage is cached until Cargo.toml or Cargo.lock changes
+# =============================================================================
+FROM base AS dependencies
+
+# Copy dependency manifests first (before source code)
+# This enables Docker layer caching - dependencies only rebuild when these files change
+COPY Cargo.toml Cargo.lock ./
+
+# Create a dummy main.rs to satisfy cargo build
+# This allows us to build dependencies without having the actual source code
+RUN mkdir -p src && echo "fn main() {}" > src/main.rs
+
+# Build dependencies only - this creates a separate cached layer
+# Since we have a dummy main.rs, cargo will build all dependencies but the main crate will be minimal
+RUN cargo build --release
+
+# Remove the dummy main.rs and target directory contents except dependencies
+# We'll copy the real source in the next stage
+RUN rm -rf src target/release/deps/static_web_lambda* target/release/static-web-lambda*
+
+# =============================================================================
+# Stage 3: Build - Compile the application with source code
+# This stage rebuilds when source code changes but reuses dependency cache
+# =============================================================================
+FROM dependencies AS build
+
+# Copy source code (this layer rebuilds when source changes)
+COPY src/ src/
+COPY .cargo/ .cargo/
+
+# Build the application
+# Dependencies are already compiled and cached from the previous stage
+RUN echo "🦀 Building Rust Lambda function for AWS deployment..." && \
+    echo "Rust version: $(rustc --version)" && \
+    echo "Cargo version: $(cargo --version)" && \
+    echo "Target: x86_64-unknown-linux-gnu (native compilation)" && \
+    echo "OS: $(cat /etc/os-release | grep PRETTY_NAME)" && \
+    echo ""
+
+# Handle Cargo.lock version compatibility and build
+RUN if ! cargo build --release 2>/dev/null; then \
+        echo "⚠️  Cargo.lock version mismatch detected, regenerating..." && \
+        rm -f Cargo.lock && \
+        echo "📦 Building project with regenerated Cargo.lock..." && \
+        cargo build --release; \
+    else \
+        echo "📦 Building project..." && \
+        cargo build --release; \
+    fi
+
+# Verify the binary was created
+RUN BINARY_PATH="target/release/static-web-lambda" && \
+    if [[ ! -f "$BINARY_PATH" ]]; then \
+        echo "❌ Error: Binary not found at $BINARY_PATH" && \
+        exit 1; \
+    fi && \
+    echo "✅ Build completed successfully!" && \
+    echo "Binary location: $BINARY_PATH" && \
+    echo "Binary size: $(stat -c%s "$BINARY_PATH") bytes" && \
+    echo "Binary type: $(file "$BINARY_PATH")" && \
+    echo "Binary dependencies:" && \
+    (ldd "$BINARY_PATH" || echo "Static binary (no dynamic dependencies)")
+
+# =============================================================================
+# Stage 4: Runtime - Create minimal deployment package
+# This stage creates the final optimized image with only the compiled binary
+# =============================================================================
+FROM --platform=linux/amd64 amazonlinux:2 AS runtime
+
+# Install only essential runtime dependencies
+RUN yum update -y && yum install -y \
+    # ZIP utility for creating deployment packages
+    zip \
+    # File utility for binary verification
+    file \
+    # Clean up yum cache to minimize image size
+    && yum clean all
 
 # Set working directory
 WORKDIR /usr/src/app
 
-# Create a build script that will be used as the default command
-RUN printf '#!/bin/bash\nset -euo pipefail\n\necho "🦀 Building Rust Lambda function for AWS deployment..."\necho "Rust version: $(rustc --version)"\necho "Cargo version: $(cargo --version)"\necho "Target: x86_64-unknown-linux-gnu (native compilation)"\necho "OS: $(cat /etc/os-release | grep PRETTY_NAME)"\necho ""\n\n# Handle Cargo.lock version compatibility\nif ! cargo build --release 2>/dev/null; then\n    echo "⚠️  Cargo.lock version mismatch detected, regenerating..."\n    rm -f Cargo.lock\n    echo "📦 Building project with regenerated Cargo.lock..."\n    cargo build --release\nelse\n    echo "📦 Building project..."\nfi\n\n# Verify the binary was created\nBINARY_PATH="target/release/static-web-lambda"\nif [[ ! -f "$BINARY_PATH" ]]; then\n    echo "❌ Error: Binary not found at $BINARY_PATH"\n    exit 1\nfi\n\necho "✅ Build completed successfully!"\necho "Binary location: $BINARY_PATH"\necho "Binary size: $(stat -c%%s "$BINARY_PATH") bytes"\necho "Binary type: $(file "$BINARY_PATH")"\necho "Binary dependencies:"\nldd "$BINARY_PATH" || echo "Static binary (no dynamic dependencies)"\n\n# Create deployment package\necho ""\necho "📦 Creating deployment package..."\nmkdir -p lambda-package\ncp "$BINARY_PATH" lambda-package/bootstrap\nchmod +x lambda-package/bootstrap\n\n# Create ZIP file\ncd lambda-package\nzip -r ../lambda-deployment.zip bootstrap\ncd ..\n\necho "✅ Deployment package created: lambda-deployment.zip"\necho "Package size: $(stat -c%%s lambda-deployment.zip) bytes"\necho "Package contents:"\nunzip -l lambda-deployment.zip\n' > /usr/local/bin/build-lambda.sh && chmod +x /usr/local/bin/build-lambda.sh
+# Copy only the compiled binary from the build stage
+COPY --from=build /usr/src/app/target/release/static-web-lambda ./target/release/static-web-lambda
 
-# Default command runs the build script
-CMD ["/usr/local/bin/build-lambda.sh"]
+# Create deployment package script
+RUN printf '#!/bin/bash\nset -euo pipefail\n\nBINARY_PATH="target/release/static-web-lambda"\n\necho "📦 Creating deployment package..."\nmkdir -p lambda-package\ncp "$BINARY_PATH" lambda-package/bootstrap\nchmod +x lambda-package/bootstrap\n\n# Create ZIP file\ncd lambda-package\nzip -r ../lambda-deployment.zip bootstrap\ncd ..\n\necho "✅ Deployment package created: lambda-deployment.zip"\necho "Package size: $(stat -c%%s lambda-deployment.zip) bytes"\necho "Package contents:"\nunzip -l lambda-deployment.zip\n' > /usr/local/bin/package-lambda.sh && chmod +x /usr/local/bin/package-lambda.sh
+
+# Default command creates the deployment package
+CMD ["/usr/local/bin/package-lambda.sh"]
 
 # Labels for documentation and maintenance
 LABEL maintainer="Static Web Lambda Project"
-LABEL description="Build environment for Rust AWS Lambda functions using Amazon Linux 2"
-LABEL version="1.0"
+LABEL description="Optimized multi-stage build for Rust AWS Lambda functions"
+LABEL version="2.0"
 LABEL rust.version="1.83"
 LABEL base.image="amazonlinux:2"
 LABEL target="x86_64-unknown-linux-gnu"
+LABEL build.type="multi-stage-optimized"

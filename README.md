@@ -299,26 +299,100 @@ RUST_LOG=info ./target/debug/static-web-lambda --mode local
 
 ## 🏗️ Building for AWS Lambda
 
-### Local Development Build
-```bash
-cargo build
-```
+This project includes an optimized build system for creating AWS Lambda deployment packages:
 
-### Production Build for Lambda (Docker - Recommended)
+### 🚀 Docker Build (Recommended)
 ```bash
-# Build using Docker with Amazon Linux 2 (matches Lambda runtime exactly)
+# Optimized Docker build with cached development images
 ./scripts/build-lambda.sh docker
 
-# This creates a lambda-deployment.zip file ready for deployment
+# This mode uses Dockerfile.optimized for:
+# - Cached development images (rebuilds only when Dockerfile changes)
+# - Ephemeral build containers (created per build, auto-removed)
+# - Optimized dependency caching (rebuilds only when Cargo.toml changes)
+# - Fast iterative development builds
 ```
 
-### Alternative: Local Cross-compilation Build
+### 🔄 Alternative Build Methods
+
+#### Local Cross-compilation Build
 ```bash
 # Build for x86_64 Lambda using local toolchain
 ./scripts/build-lambda.sh local
 ```
 
-The Docker approach is recommended as it uses the same Amazon Linux 2 base image as AWS Lambda, ensuring complete glibc compatibility and avoiding runtime issues.
+#### Native Build (Testing Only)
+```bash
+# Native compilation (for testing only - won't work on Lambda)
+./scripts/build-lambda.sh native
+```
+
+### 📊 Build Mode Comparison
+
+| Build Mode | Speed | Use Case | Container Strategy | Optimization |
+|------------|-------|----------|-------------------|--------------|
+| **docker** | 🎯 Optimized | Development & deployment | Cached images + ephemeral containers | Fast rebuilds & layer caching |
+| **local** | 🏠 Fast | Local development | No containers | Cross-compilation |
+| **native** | ⚡ Fastest | Testing only | No containers | Native compilation |
+
+### 🛠️ Build Mode Details
+
+#### Docker Mode (`docker`)
+- **Purpose**: Fast development builds with deployment-ready packages
+- **Strategy**: Cached development images with ephemeral build containers
+- **Benefits**:
+  - Cached development image (reused across builds for speed)
+  - Ephemeral containers (created per build, auto-removed for cleanliness)
+  - Optimized dependency caching (dependencies only rebuild when Cargo.toml changes)
+  - Uses Amazon Linux 2 (same as AWS Lambda runtime)
+  - Fast iterative development with deployment-ready output
+- **Best for**: Both development and production deployments
+
+#### Local Mode (`local`)
+- **Purpose**: Fast local development builds
+- **Strategy**: Cross-compilation using local Rust toolchain
+- **Benefits**:
+  - No Docker required
+  - Fast compilation
+  - Good for development iteration
+- **Best for**: Local development when Docker is not available
+
+### 🔧 Build Script Options
+
+```bash
+# Show all available build options
+./scripts/build-lambda.sh --help
+
+# Available build methods:
+#   docker          Build using optimized Docker with cached development images (recommended)
+#   local           Build using local cross-compilation toolchain
+#   native          Build using native compilation (for testing only)
+#   codebuild       Generate AWS CodeBuild configuration
+
+# Additional options:
+#   --clean         Clean build artifacts before building
+#   --verbose       Enable verbose output
+#   --validate      Validate build environment
+#   --package-only  Only create deployment package (skip compilation)
+```
+
+### 🚀 Quick Start Examples
+
+```bash
+# Recommended for production deployment
+./scripts/build-lambda.sh docker
+
+# For local development (no Docker required)
+./scripts/build-lambda.sh local
+
+# Clean build with verbose output
+./scripts/build-lambda.sh docker --clean --verbose
+
+# Validate build environment
+./scripts/build-lambda.sh --validate
+```
+
+All build modes create a `lambda-deployment.zip` file ready for AWS Lambda deployment.
 
 ## 📁 Project Structure
 
@@ -420,25 +494,54 @@ This approach is recommended as it ensures complete compatibility with AWS Lambd
 
 ## 🚀 Deployment
 
-The project includes automated build scripts for creating Lambda deployment packages:
+The project includes an optimized build script for creating Lambda deployment packages:
 
-1. **Build Lambda package using Docker** (recommended):
+### 🎯 Recommended Deployment Workflow
+
+1. **Build optimized deployment package**:
    ```bash
+   # Create optimized deployment package using multi-stage Docker build
    ./scripts/build-lambda.sh docker
    ```
 
-2. **Alternative: Build using local cross-compilation**:
-   ```bash
-   ./scripts/build-lambda.sh local
-   ```
-
-3. **Deploy the generated package**:
+2. **Deploy the generated package**:
    ```bash
    # The build script creates lambda-deployment.zip
    # Deploy using AWS CLI, CDK, Terraform, or AWS Console
+   
+   # Example with AWS CLI:
+   aws lambda update-function-code \
+     --function-name your-function-name \
+     --zip-file fileb://lambda-deployment.zip
    ```
 
-The Docker build uses Amazon Linux 2 (same as Lambda runtime) to ensure complete compatibility.
+### 🔄 Alternative Build Methods
+
+```bash
+# Local cross-compilation (no Docker required)
+./scripts/build-lambda.sh local
+
+# Native build (testing only)
+./scripts/build-lambda.sh native
+```
+
+### 🏗️ CI/CD Integration
+
+For automated deployments, use Docker mode in your CI/CD pipeline:
+
+```yaml
+# Example GitHub Actions step
+- name: Build Lambda package
+  run: ./scripts/build-lambda.sh docker
+
+- name: Deploy to AWS Lambda
+  run: |
+    aws lambda update-function-code \
+      --function-name ${{ env.LAMBDA_FUNCTION_NAME }} \
+      --zip-file fileb://lambda-deployment.zip
+```
+
+The optimized build system ensures fast development cycles while producing efficient deployment packages with cached development images.
 
 ## 📄 License
 

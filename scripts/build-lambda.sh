@@ -46,7 +46,7 @@ USAGE:
     $0 [OPTIONS] [BUILD_METHOD]
 
 BUILD METHODS:
-    docker          Build using Docker (recommended for cross-platform)
+    docker          Build using optimized Docker with cached development images (recommended)
     local           Build using local cross-compilation toolchain
     native          Build using native compilation (for testing only)
     codebuild       Generate AWS CodeBuild configuration
@@ -59,7 +59,7 @@ OPTIONS:
     --package-only  Only create deployment package (skip compilation)
 
 EXAMPLES:
-    $0 docker                    # Build using Docker
+    $0 docker                    # Build using optimized Docker with cached images
     $0 local --clean             # Clean build using local toolchain
     $0 --validate                # Check build environment
     $0 codebuild                 # Generate CodeBuild configuration
@@ -143,12 +143,20 @@ clean_build() {
     log_success "Build artifacts cleaned."
 }
 
-# Build using Docker
+# Build using Docker (optimized with cached images)
 build_docker() {
-    log_info "Building using Docker..."
+    log_info "Building using Docker (optimized with cached images)..."
     
-    local target_arch="${TARGET_ARCH:-x86_64-unknown-linux-gnu}"
-    local cargo_flags="${CARGO_FLAGS:-}"
+    # Configuration for multi-stage Docker build
+    local dockerfile="Dockerfile.build"
+    local dev_image="lambda-rust-dev-image"
+    
+    # Check if optimized Dockerfile exists
+    if [[ ! -f "$dockerfile" ]]; then
+        log_error "Dockerfile not found: $dockerfile"
+        log_error "Please ensure the multi-stage Dockerfile is available."
+        return 1
+    fi
     
     # Check if Docker is available
     if ! command -v docker &> /dev/null; then
@@ -161,36 +169,78 @@ build_docker() {
         return 1
     fi
     
-    log_info "Using custom Dockerfile.build for AWS Lambda compatibility"
-    log_info "Target architecture: $target_arch"
+    log_info "Using optimized Docker build with cached development image"
+    log_info "This mode reuses cached base images and uses ephemeral containers for builds"
+    log_info "Dockerfile: $dockerfile"
     
-    # Build the Docker image from our custom Dockerfile
-    log_info "Building Docker image..."
-    if ! docker build -f Dockerfile.build -t lambda-rust-builder .; then
-        log_error "Failed to build Docker image"
-        return 1
+    # Check if development image exists
+    local image_exists=false
+    if docker images --format "{{.Repository}}" | grep -q "^$dev_image$"; then
+        image_exists=true
+        log_info "Development image already exists: $dev_image"
     fi
     
-    # Run the build using our custom image
-    log_info "Running build in Docker container..."
-    if docker run --rm --platform linux/amd64 \
-        -v "$PWD":/usr/src/app \
-        -w /usr/src/app \
-        lambda-rust-builder; then
+    # Build development image if needed
+    if [[ "$image_exists" != "true" ]]; then
+        log_info "Building cached development image: $dev_image"
+        log_info "This will be reused for future builds to improve speed"
         
-        log_success "Docker build completed successfully."
-        
-        # Copy the binary to expected location for compatibility
-        local binary_path="$TARGET_DIR/release/$PROJECT_NAME"
-        if [[ -f "$binary_path" ]]; then
-            log_info "Binary built at: $binary_path"
-            return 0
+        # Build up to the dependencies stage for development use
+        if docker build -f "$dockerfile" --target dependencies -t "$dev_image" .; then
+            log_success "Development image built successfully: $dev_image"
         else
-            log_error "Binary not found at expected location: $binary_path"
+            log_error "Failed to build development image"
             return 1
         fi
+    fi
+    
+    # Get absolute path for volume mounting
+    local project_root=$(pwd)
+    
+    log_info "Running ephemeral build container..."
+    log_info "Image: $dev_image"
+    log_info "Source mount: $project_root -> /usr/src/app"
+    
+    # Run build in ephemeral container (automatically removed after completion)
+    if docker run --rm \
+        --platform linux/amd64 \
+        -v "$project_root:/usr/src/app" \
+        -w "/usr/src/app" \
+        "$dev_image" \
+        bash -c "
+        set -euo pipefail
+        echo '🦀 Building Rust Lambda function in ephemeral container...'
+        echo 'Rust version: \$(rustc --version)'
+        echo 'Cargo version: \$(cargo --version)'
+        echo ''
+        
+        # Handle Cargo.lock version compatibility and build
+        if ! cargo build --release 2>/dev/null; then
+            echo '⚠️  Cargo.lock version mismatch detected, regenerating...'
+            rm -f Cargo.lock
+            echo '📦 Building project with regenerated Cargo.lock...'
+            cargo build --release
+        else
+            echo '📦 Building project...'
+            cargo build --release
+        fi
+        
+        # Verify the binary was created
+        BINARY_PATH=\"target/release/$PROJECT_NAME\"
+        if [[ ! -f \"\$BINARY_PATH\" ]]; then
+            echo '❌ Error: Binary not found at \$BINARY_PATH'
+            exit 1
+        fi
+        
+        echo '✅ Build completed successfully!'
+        echo \"Binary location: \$BINARY_PATH\"
+        echo \"Binary size: \$(stat -c%s \"\$BINARY_PATH\") bytes\"
+        echo \"Binary type: \$(file \"\$BINARY_PATH\")\"
+    "; then
+        log_success "Project built successfully using cached development image"
+        return 0
     else
-        log_error "Docker build failed."
+        log_error "Build failed in ephemeral container"
         return 1
     fi
 }
