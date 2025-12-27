@@ -1,7 +1,7 @@
 # Makefile for Static Web Lambda project
 # This provides convenient commands for development and testing
 
-.PHONY: help build test test-html run clean check build-lambda build-docker build-local deploy-package package-zip
+.PHONY: help build test test-html run clean check build-lambda build-docker build-local deploy-package package-zip docs docs-open
 
 # Default target - show help
 help:
@@ -14,6 +14,8 @@ help:
 	@echo "  make run        - Run the Lambda function locally (will start and stop)"
 	@echo "  make check      - Check code without building"
 	@echo "  make clean      - Clean build artifacts"
+	@echo "  make docs       - Generate documentation"
+	@echo "  make docs-open  - Generate and open documentation in browser"
 	@echo ""
 	@echo "Deployment Commands:"
 	@echo "  make build-lambda    - Interactive deployment build menu"
@@ -83,3 +85,11 @@ deploy-package:
 package-zip:
 	@echo "📦 Creating ZIP package from bootstrap executable..."
 	@./scripts/package-lambda.sh
+
+docs:
+	@echo "📚 Generating documentation..."
+	cargo doc --no-deps --document-private-items
+
+docs-open:
+	@echo "📚 Generating and opening documentation..."
+	cargo doc --no-deps --document-private-items --open
