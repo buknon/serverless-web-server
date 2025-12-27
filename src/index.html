@@ -12,98 +12,338 @@
     <!-- Page title that appears in browser tab -->
     <title>Static Web Lambda - Rust Serverless</title>
     
-    <!-- Basic CSS styling embedded directly in the HTML
-         This keeps everything self-contained in a single response -->
+    <!-- AWS-inspired styling with clean, professional design -->
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            line-height: 1.6;
+        * {
             margin: 0;
-            padding: 2rem;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: "Amazon Ember", "Helvetica Neue", Roboto, Arial, sans-serif;
+            line-height: 1.6;
+            color: #232F3E;
+            background-color: #FFFFFF;
             min-height: 100vh;
+        }
+        
+        /* Header section with AWS-style navigation */
+        .header {
+            background-color: #232F3E;
+            color: white;
+            padding: 1rem 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
             display: flex;
             align-items: center;
-            justify-content: center;
+            justify-content: space-between;
         }
         
-        .container {
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #FF9900;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            list-style: none;
+        }
+        
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.3s ease;
+        }
+        
+        .nav-links a:hover {
+            color: #FF9900;
+        }
+        
+        /* Hero section */
+        .hero {
+            background: linear-gradient(135deg, #232F3E 0%, #3C4858 100%);
+            color: white;
+            padding: 4rem 0;
             text-align: center;
-            max-width: 600px;
-            background: rgba(255, 255, 255, 0.1);
-            padding: 3rem;
-            border-radius: 15px;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
         }
         
-        h1 {
-            font-size: 2.5rem;
+        .hero-content {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+        
+        .hero h1 {
+            font-size: 3rem;
+            font-weight: 300;
             margin-bottom: 1rem;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            line-height: 1.2;
         }
         
-        p {
-            font-size: 1.2rem;
-            margin-bottom: 1.5rem;
+        .hero .subtitle {
+            font-size: 1.3rem;
+            margin-bottom: 2rem;
             opacity: 0.9;
+            font-weight: 300;
         }
         
-        .tech-stack {
+        .cta-button {
+            display: inline-block;
+            background-color: #FF9900;
+            color: white;
+            padding: 1rem 2rem;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: 500;
+            font-size: 1rem;
+            transition: background-color 0.3s ease;
+            margin-top: 1rem;
+        }
+        
+        .cta-button:hover {
+            background-color: #E88B00;
+        }
+        
+        /* Main content section */
+        .main-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 4rem 2rem;
+        }
+        
+        .section-title {
+            font-size: 2rem;
+            font-weight: 300;
+            text-align: center;
+            margin-bottom: 3rem;
+            color: #232F3E;
+        }
+        
+        /* Feature cards */
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            margin-bottom: 4rem;
+        }
+        
+        .feature-card {
+            background: white;
+            border: 1px solid #E1E8ED;
+            border-radius: 8px;
+            padding: 2rem;
+            text-align: center;
+            transition: box-shadow 0.3s ease, transform 0.3s ease;
+        }
+        
+        .feature-card:hover {
+            box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+        }
+        
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            display: block;
+        }
+        
+        .feature-card h3 {
+            font-size: 1.3rem;
+            font-weight: 500;
+            margin-bottom: 1rem;
+            color: #232F3E;
+        }
+        
+        .feature-card p {
+            color: #666;
+            line-height: 1.6;
+        }
+        
+        /* Tech stack section */
+        .tech-section {
+            background-color: #F8F9FA;
+            padding: 3rem 0;
+            margin-top: 2rem;
+        }
+        
+        .tech-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            text-align: center;
+        }
+        
+        .tech-grid {
             display: flex;
             justify-content: center;
-            gap: 1rem;
+            gap: 2rem;
             flex-wrap: wrap;
             margin-top: 2rem;
         }
         
         .tech-badge {
-            background: rgba(255, 255, 255, 0.2);
-            padding: 0.5rem 1rem;
-            border-radius: 25px;
-            font-size: 0.9rem;
+            background: white;
+            border: 2px solid #FF9900;
+            color: #232F3E;
+            padding: 0.8rem 1.5rem;
+            border-radius: 6px;
             font-weight: 500;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
         }
         
-        /* Responsive design for smaller screens */
+        .tech-badge:hover {
+            background-color: #FF9900;
+            color: white;
+        }
+        
+        /* Footer */
+        .footer {
+            background-color: #232F3E;
+            color: white;
+            text-align: center;
+            padding: 2rem 0;
+            margin-top: 2rem;
+        }
+        
+        .footer p {
+            opacity: 0.8;
+        }
+        
+        /* Responsive design */
         @media (max-width: 768px) {
-            body {
-                padding: 1rem;
+            .header-content {
+                flex-direction: column;
+                gap: 1rem;
             }
             
-            .container {
-                padding: 2rem;
+            .nav-links {
+                gap: 1rem;
             }
             
-            h1 {
-                font-size: 2rem;
+            .hero h1 {
+                font-size: 2.2rem;
             }
             
-            p {
-                font-size: 1rem;
+            .hero .subtitle {
+                font-size: 1.1rem;
+            }
+            
+            .main-content {
+                padding: 2rem 1rem;
+            }
+            
+            .features {
+                grid-template-columns: 1fr;
+            }
+            
+            .tech-grid {
+                gap: 1rem;
             }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🦀 Rust Lambda Function</h1>
-        <p>
-            Welcome to your serverless static web application! This page is served by a 
-            Rust-powered AWS Lambda function using Function URLs for direct HTTP access.
-        </p>
-        <p>
-            This demonstrates a simple, cost-effective way to serve static content 
-            using modern serverless architecture.
-        </p>
-        
-        <div class="tech-stack">
-            <span class="tech-badge">🦀 Rust</span>
-            <span class="tech-badge">⚡ AWS Lambda</span>
-            <span class="tech-badge">🌐 Function URLs</span>
-            <span class="tech-badge">🏗️ Terraform</span>
+    <!-- Header with AWS-style navigation -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">AWS Lambda</div>
+            <nav>
+                <ul class="nav-links">
+                    <li><a href="#features">Features</a></li>
+                    <li><a href="#tech">Technology</a></li>
+                    <li><a href="#docs">Documentation</a></li>
+                </ul>
+            </nav>
         </div>
-    </div>
+    </header>
+    
+    <!-- Hero section -->
+    <section class="hero">
+        <div class="hero-content">
+            <h1>Serverless Static Web Application</h1>
+            <p class="subtitle">
+                Powered by Rust and AWS Lambda with Function URLs for direct HTTP access
+            </p>
+            <p>
+                Experience the power of modern serverless architecture with blazing-fast performance,
+                automatic scaling, and cost-effective hosting.
+            </p>
+            <a href="#features" class="cta-button">Explore Features</a>
+        </div>
+    </section>
+    
+    <!-- Main content -->
+    <main class="main-content">
+        <h2 class="section-title" id="features">Why Choose Serverless?</h2>
+        
+        <div class="features">
+            <div class="feature-card">
+                <span class="feature-icon">⚡</span>
+                <h3>Lightning Fast</h3>
+                <p>
+                    Built with Rust for maximum performance and minimal cold start times.
+                    Your users get instant responses every time.
+                </p>
+            </div>
+            
+            <div class="feature-card">
+                <span class="feature-icon">💰</span>
+                <h3>Cost Effective</h3>
+                <p>
+                    Pay only for what you use. No servers to maintain, no idle costs.
+                    Perfect for static sites with variable traffic.
+                </p>
+            </div>
+            
+            <div class="feature-card">
+                <span class="feature-icon">🔧</span>
+                <h3>Zero Maintenance</h3>
+                <p>
+                    AWS handles all the infrastructure. Focus on your content,
+                    not on server management and scaling concerns.
+                </p>
+            </div>
+            
+            <div class="feature-card">
+                <span class="feature-icon">🌍</span>
+                <h3>Global Scale</h3>
+                <p>
+                    Automatically scales to handle traffic spikes and serves
+                    content from AWS's global edge network.
+                </p>
+            </div>
+        </div>
+    </main>
+    
+    <!-- Technology stack section -->
+    <section class="tech-section" id="tech">
+        <div class="tech-content">
+            <h2 class="section-title">Built with Modern Technology</h2>
+            <p>This application leverages cutting-edge technologies for optimal performance and developer experience.</p>
+            
+            <div class="tech-grid">
+                <span class="tech-badge">🦀 Rust</span>
+                <span class="tech-badge">⚡ AWS Lambda</span>
+                <span class="tech-badge">🌐 Function URLs</span>
+                <span class="tech-badge">🏗️ Terraform</span>
+                <span class="tech-badge">☁️ AWS Cloud</span>
+            </div>
+        </div>
+    </section>
+    
+    <!-- Footer -->
+    <footer class="footer">
+        <p>&copy; 2026 Serverless Static Web Application. Powered by AWS Lambda and Rust.</p>
+    </footer>
 </body>
 </html>
