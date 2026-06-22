@@ -69,38 +69,38 @@ Migrate the Static Web Lambda project from Docker-based cross-compilation to car
 - [x] 5. Checkpoint - Verify build still works after file removal
   - Ensure `cargo lambda build --release --arm64 --output-format zip` succeeds and `cargo test` passes after deprecated files are removed. Ask the user if questions arise.
 
-- [ ] 6. Update documentation
-  - [ ] 6.1 Rewrite README.md "Building for AWS Lambda" section to use cargo-lambda commands (`cargo lambda build --release --arm64 --output-format zip`)
+- [x] 6. Update documentation
+  - [x] 6.1 Rewrite README.md "Building for AWS Lambda" section to use cargo-lambda commands (`cargo lambda build --release --arm64 --output-format zip`)
     - Remove all Docker build instructions, build mode comparison table, and `build-lambda.sh` references
     - _Requirements: 6.1_
-  - [ ] 6.2 Update README.md "Development Workflow" subsection step 4 to use `make build-deploy` instead of `cargo build --release --target x86_64-unknown-linux-gnu`
+  - [x] 6.2 Update README.md "Development Workflow" subsection step 4 to use `make build-deploy` instead of `cargo build --release --target x86_64-unknown-linux-gnu`
     - _Requirements: 6.1_
-  - [ ] 6.3 Update README.md "Project Structure" section to remove references to deleted files (`.cargo/config.toml`, scripts, Dockerfile)
+  - [x] 6.3 Update README.md "Project Structure" section to remove references to deleted files (`.cargo/config.toml`, scripts, Dockerfile)
     - _Requirements: 6.1_
-  - [ ] 6.4 Update README.md "Deployment" section to document the new workflow: `make build-lambda` → `make deploy` (or `make build-deploy`)
+  - [x] 6.4 Update README.md "Deployment" section to document the new workflow: `make build-lambda` → `make deploy` (or `make build-deploy`)
     - Remove references to `build-lambda.sh`, Docker, and `lambda-deployment.zip`
     - _Requirements: 6.1_
-  - [ ] 6.5 Update README.md "Troubleshooting" section to remove Docker-related troubleshooting and add cargo-lambda troubleshooting (installation issues, build failures)
+  - [x] 6.5 Update README.md "Troubleshooting" section to remove Docker-related troubleshooting and add cargo-lambda troubleshooting (installation issues, build failures)
     - _Requirements: 6.1_
-  - [ ] 6.6 Add `cargo lambda watch` documentation to README.md development workflow as the recommended local testing option alongside `--mode local`
+  - [x] 6.6 Add `cargo lambda watch` documentation to README.md development workflow as the recommended local testing option alongside `--mode local`
     - _Requirements: 6.5_
-  - [ ] 6.7 Rewrite `docs/DEPLOYMENT.md` to document cargo-lambda workflow: build command, local testing with `cargo lambda watch`/`cargo lambda invoke`, and Terraform deployment
+  - [x] 6.7 Rewrite `docs/DEPLOYMENT.md` to document cargo-lambda workflow: build command, local testing with `cargo lambda watch`/`cargo lambda invoke`, and Terraform deployment
     - Remove all Docker build methods, CodeBuild, `build-lambda.sh` references, and the old package structure
     - _Requirements: 6.2_
-  - [ ] 6.8 Add GitHub Actions CI/CD example to `docs/DEPLOYMENT.md` using `pip3 install cargo-lambda` and `cargo lambda build`
+  - [x] 6.8 Add GitHub Actions CI/CD example to `docs/DEPLOYMENT.md` using `pip3 install cargo-lambda` and `cargo lambda build`
     - _Requirements: 9.1, 9.2, 9.3_
 
-- [ ] 7. Update .gitignore
-  - [ ] 7.1 Remove `*.zip` glob from `.gitignore` (the build artifact is in `target/` which is already ignored; the glob was for the old `lambda-deployment.zip`)
+- [x] 7. Update .gitignore
+  - [x] 7.1 Remove `*.zip` glob from `.gitignore` (the build artifact is in `target/` which is already ignored; the glob was for the old `lambda-deployment.zip`)
     - _Requirements: 2.4_
-  - [ ] 7.2 Remove `bootstrap` entry from `.gitignore` (was for the old `lambda-package/bootstrap`)
+  - [x] 7.2 Remove `bootstrap` entry from `.gitignore` (was for the old `lambda-package/bootstrap`)
     - _Requirements: 2.4_
-  - [ ] 7.3 Remove `.dockerignore` entry from `.gitignore` (file no longer exists)
+  - [x] 7.3 Remove `.dockerignore` entry from `.gitignore` (file no longer exists)
     - _Requirements: 2.6_
-  - [ ] 7.4 Remove `.aws-sam/` entry from `.gitignore` (not used in this project)
+  - [x] 7.4 Remove `.aws-sam/` entry from `.gitignore` (not used in this project)
     - _Requirements: 2.6_
 
-- [ ] 8. Final checkpoint - Verify full pipeline
+- [x] 8. Final checkpoint - Verify full pipeline
   - Ensure `cargo test` passes, `cargo lambda build --release --arm64 --output-format zip` produces the expected artifact, and `terraform plan` shows no errors. Ask the user if questions arise.
 
 ## Notes
