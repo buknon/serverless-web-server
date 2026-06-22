@@ -1,280 +1,183 @@
 # Deployment Guide for Static Web Lambda
 
-This guide covers all deployment build options for the Static Web Lambda project, including Docker-based builds, local cross-compilation, and AWS CodeBuild integration.
+This guide covers building, testing locally, and deploying the Static Web Lambda project using cargo-lambda and Terraform.
 
 ## Overview
 
-## Overview
+The project uses [cargo-lambda](https://www.cargo-lambda.info/) to build, test, and package the Lambda function. cargo-lambda handles cross-compilation to ARM64 Linux internally (using Zig as a linker), produces a ready-to-deploy ZIP artifact, and provides a local Lambda emulator for development. No Docker, shell scripts, or manual packaging steps are required.
 
-The Static Web Lambda project supports multiple build methods to create AWS Lambda-compatible deployment packages:
+**Build pipeline:**
 
-1. **Docker Build** (Recommended) - Uses Amazon Linux 2 base image matching AWS Lambda runtime exactly
-2. **Local Cross-compilation** - Uses local Rust toolchain with Linux target
-3. **Native Build** - For local testing only (not Lambda-compatible unless on Amazon Linux)
-4. **AWS CodeBuild** - Cloud-based build service with native Linux environment
+```
+cargo lambda build → bootstrap.zip → terraform apply → AWS Lambda (ARM64, provided.al2023)
+```
 
-## Quick Start
+## Prerequisites
 
-The fastest way to create a deployment package:
+Install cargo-lambda using one of:
 
 ```bash
-# Build using Docker (recommended)
-./scripts/build-lambda.sh docker
+# Via pip (works everywhere, recommended for CI)
+pip3 install cargo-lambda
 
-# Or build using local cross-compilation
-./scripts/build-lambda.sh local
+# Via Homebrew (macOS/Linux)
+brew install cargo-lambda
 ```
 
-This will create a `lambda-deployment.zip` file ready for AWS Lambda deployment.
+You also need:
+- Rust toolchain (stable) — install via [rustup](https://rustup.rs/)
+- Terraform — for infrastructure deployment
+- AWS credentials configured — for deploying to AWS
 
-## Build Methods
+## Build Command
 
-### 1. Docker Build (Recommended)
-
-Docker builds provide the most reliable AWS Lambda compatibility by using the same Amazon Linux 2 base image as the Lambda runtime environment.
-
-**Prerequisites:**
-- Docker installed and running
-- Project source code
-
-**Usage:**
-```bash
-# Basic Docker build
-./scripts/build-lambda.sh docker
-
-# Clean build with verbose output
-./scripts/build-lambda.sh docker --clean --verbose
-```
-
-**Advantages:**
-- Uses Amazon Linux 2 (same as AWS Lambda runtime)
-- Complete glibc compatibility - no version mismatches
-- Works on any platform (macOS, Windows, Linux)
-- Consistent build environment
-- No local cross-compilation setup required
-- Reproducible builds
-
-**How it works:**
-1. Uses custom `Dockerfile.build` with Amazon Linux 2 base image
-2. Installs Rust 1.83 natively on Amazon Linux 2
-3. Compiles project using native compilation (no cross-compilation needed)
-4. Creates deployment package with `bootstrap` executable
-
-**Platform Compatibility:**
-- Works on Apple Silicon (M1/M2) Macs using `--platform linux/amd64`
-- Works on Intel Macs and Linux systems
-- Works on Windows with Docker Desktop
-
-### 2. Local Cross-compilation
-
-Uses your local Rust installation with Linux target for faster builds.
-
-**Prerequisites:**
-- Rust toolchain installed locally
-- Linux target installed (`x86_64-unknown-linux-gnu`)
-
-**Setup:**
-```bash
-# Install Linux target (done automatically by build script)
-rustup target add x86_64-unknown-linux-gnu
-```
-
-**Usage:**
-```bash
-# Basic local build
-./scripts/build-lambda.sh local
-
-# Clean build
-./scripts/build-lambda.sh local --clean
-
-# Custom target architecture
-TARGET_ARCH=x86_64-unknown-linux-musl ./scripts/build-lambda.sh local
-```
-
-**Advantages:**
-- Faster builds (no Docker overhead)
-- Uses local Rust cache
-- Direct access to build artifacts
-
-**Limitations:**
-- May require additional setup on some platforms (especially macOS cross-compiling to Linux)
-- Platform-specific linking issues possible
-- Requires local Rust toolchain with cross-compilation support
-
-**macOS Note:** The Docker build approach is recommended for all platforms as it ensures complete compatibility with AWS Lambda runtime environment.
-
-### 3. Native Build (Testing Only)
-
-Builds using your native platform. **Only use for local testing - will not work on AWS Lambda unless built on Amazon Linux.**
-
-**Usage:**
-```bash
-# Native build (testing only)
-./scripts/build-lambda.sh native
-```
-
-**Warning:** Native builds are only compatible with AWS Lambda if built on Amazon Linux. Use Docker or local cross-compilation for actual deployments.
-
-### 4. AWS CodeBuild
-
-Generates configuration files for AWS CodeBuild service to handle builds in the cloud.
-
-**Usage:**
-```bash
-# Generate CodeBuild configuration
-./scripts/build-lambda.sh codebuild
-```
-
-This creates:
-- `buildspec.yml` - CodeBuild build specification
-- `codebuild-project-template.json` - CodeBuild project template
-
-**Setup AWS CodeBuild:**
-
-1. **Create S3 bucket for artifacts:**
-   ```bash
-   aws s3 mb s3://your-lambda-build-artifacts
-   ```
-
-2. **Create CodeBuild service role:**
-   ```bash
-   aws iam create-role --role-name codebuild-static-web-lambda-service-role \
-     --assume-role-policy-document file://codebuild-trust-policy.json
-   ```
-
-3. **Create CodeBuild project:**
-   ```bash
-   # Update codebuild-project-template.json with your details
-   aws codebuild create-project --cli-input-json file://codebuild-project-template.json
-   ```
-
-4. **Start build:**
-   ```bash
-   aws codebuild start-build --project-name static-web-lambda-build
-   ```
-
-## Build Script Options
-
-The `scripts/build-lambda.sh` script supports various options:
-
-### Command Line Options
+Build the Lambda deployment artifact:
 
 ```bash
-./scripts/build-lambda.sh [OPTIONS] [BUILD_METHOD]
+cargo lambda build --release --arm64 --output-format zip
 ```
 
-**Build Methods:**
-- `docker` - Build using Docker (recommended)
-- `local` - Build using local cross-compilation
-- `native` - Build using native compilation (testing only)
-- `codebuild` - Generate AWS CodeBuild configuration
-
-**Options:**
-- `-h, --help` - Show help message
-- `-v, --verbose` - Enable verbose output
-- `-c, --clean` - Clean build artifacts before building
-- `--validate` - Validate build environment only
-- `--package-only` - Create deployment package from existing binary
-
-### Environment Variables
-
-Customize build behavior with environment variables:
+Or use the Makefile shortcut:
 
 ```bash
-# Custom Docker image
-DOCKER_IMAGE=rust:1.70-slim ./scripts/build-lambda.sh docker
-
-# Custom target architecture
-TARGET_ARCH=x86_64-unknown-linux-musl ./scripts/build-lambda.sh local
-
-# Additional cargo flags
-CARGO_FLAGS="--features production" ./scripts/build-lambda.sh docker
+make build-lambda
 ```
 
-### Examples
+This produces:
+
+```
+target/lambda/static-web-lambda/bootstrap.zip
+```
+
+cargo-lambda automatically:
+- Cross-compiles to `aarch64-unknown-linux-gnu` (ARM64 Linux)
+- Names the binary `bootstrap` (required by Lambda custom runtimes)
+- Strips debug symbols for optimal size
+- Packages the binary into a ZIP file
+
+## Build Artifact Structure
+
+The output is a single ZIP file containing the compiled binary:
+
+```
+target/lambda/static-web-lambda/bootstrap.zip
+└── bootstrap          # ARM64 Linux ELF executable
+```
+
+| Property | Value |
+|----------|-------|
+| Path | `target/lambda/static-web-lambda/bootstrap.zip` |
+| Binary name | `bootstrap` |
+| Architecture | ARM64 (`aarch64-unknown-linux-gnu`) |
+| Format | ZIP containing a single executable |
+
+## Local Testing
+
+cargo-lambda provides a local Lambda emulator for development. This is the recommended way to test changes before deploying.
+
+### Start the Local Emulator
 
 ```bash
-# Validate build environment
-./scripts/build-lambda.sh --validate
-
-# Clean Docker build with verbose output
-./scripts/build-lambda.sh docker --clean --verbose
-
-# Local build with custom target
-TARGET_ARCH=x86_64-unknown-linux-musl ./scripts/build-lambda.sh local
-
-# Create package from existing binary
-./scripts/build-lambda.sh --package-only
-
-# Generate CodeBuild configuration
-./scripts/build-lambda.sh codebuild
+cargo lambda watch
 ```
 
-## Build Validation and Error Handling
+Or via Makefile:
 
-The build script includes comprehensive validation and error handling:
-
-### Environment Validation
-
-Before building, the script validates:
-- Cargo.toml exists (correct directory)
-- Rust/Cargo installed
-- Docker available (for Docker builds)
-- Required source files exist
-
-### Build Validation
-
-During and after building:
-- Binary creation verification
-- File permissions validation
-- Package size reporting
-- ZIP contents verification
-
-### Error Handling
-
-The script handles common errors:
-- Missing dependencies
-- Docker daemon not running
-- Cross-compilation target not installed
-- Build failures with clear error messages
-- Package creation failures
-
-## Deployment Package Structure
-
-The build process creates a deployment package with this structure:
-
-```
-lambda-deployment.zip
-└── bootstrap          # Executable binary (required name for Lambda)
+```bash
+make watch
 ```
 
-**Key Requirements:**
-- Binary must be named `bootstrap` (AWS Lambda requirement)
-- Binary must have executable permissions (`chmod +x`)
-- Binary must be compiled for Linux (`x86_64-unknown-linux-gnu`)
-- Package must be in ZIP format
+This starts a local Lambda emulator at `http://localhost:9000` with:
+- **Hot-reload** — automatically recompiles when source files change
+- **Lambda-compatible event handling** — accepts the same event payloads as AWS Lambda
+- **No Docker required** — runs natively on your machine
 
-## Integration with Terraform
+### Invoke the Local Function
 
-The deployment package integrates with Terraform for infrastructure deployment:
+In a separate terminal, send a test event:
+
+```bash
+cargo lambda invoke static-web-lambda --data-ascii '{
+  "httpMethod": "GET",
+  "path": "/",
+  "requestContext": {"http": {"method": "GET", "path": "/"}}
+}'
+```
+
+Or via Makefile:
+
+```bash
+make invoke
+```
+
+The emulator returns the same response structure your function produces in AWS.
+
+## Terraform Deployment
+
+The Terraform configuration in `terraform/` deploys the Lambda function to AWS. It references the cargo-lambda build artifact directly.
+
+### Deploy
+
+```bash
+# Build and deploy in one step
+make build-deploy
+
+# Or separately:
+make build-lambda
+make deploy
+```
+
+The `make deploy` target runs:
+
+```bash
+cd terraform && terraform apply
+```
+
+### Terraform Integration
+
+The `terraform/lambda.tf` configuration references the cargo-lambda output:
 
 ```hcl
-# terraform/main.tf
-resource "aws_lambda_function" "static_web" {
-  filename         = "../lambda-deployment.zip"
-  function_name    = "static-web-lambda"
-  role            = aws_iam_role.lambda_role.arn
-  handler         = "bootstrap"
-  runtime         = "provided.al2"
-  
-  # Ensure package is rebuilt when source changes
-  source_code_hash = filebase64sha256("../lambda-deployment.zip")
+resource "aws_lambda_function" "static_web_lambda" {
+  filename         = "${path.module}/../target/lambda/static-web-lambda/bootstrap.zip"
+  source_code_hash = filebase64sha256("${path.module}/../target/lambda/static-web-lambda/bootstrap.zip")
+
+  architectures = ["arm64"]
+  runtime       = "provided.al2023"
+  handler       = "bootstrap"
+
+  # ... other configuration
 }
 ```
 
-## Continuous Integration
+| Attribute | Value | Purpose |
+|-----------|-------|---------|
+| `filename` | `../target/lambda/static-web-lambda/bootstrap.zip` | Path to cargo-lambda output |
+| `source_code_hash` | `filebase64sha256(...)` | Triggers redeployment on code changes |
+| `architectures` | `["arm64"]` | Matches the `--arm64` build flag |
+| `runtime` | `"provided.al2023"` | Custom runtime for Rust binary |
+| `handler` | `"bootstrap"` | Convention for custom runtimes |
 
-### GitHub Actions Example
+### Deployment Workflow
+
+1. **Build** — `cargo lambda build --release --arm64 --output-format zip`
+2. **Plan** — `cd terraform && terraform plan` (review changes)
+3. **Apply** — `cd terraform && terraform apply` (deploy to AWS)
+4. **Verify** — Check the Function URL output from Terraform
+
+## Makefile Targets
+
+| Target | Command | Description |
+|--------|---------|-------------|
+| `make build-lambda` | `cargo lambda build --release --arm64 --output-format zip` | Build deployment artifact |
+| `make watch` | `cargo lambda watch` | Start local emulator with hot-reload |
+| `make invoke` | `cargo lambda invoke ...` | Send test event to local emulator |
+| `make deploy` | `cd terraform && terraform apply` | Deploy via Terraform |
+| `make build-deploy` | build-lambda + deploy | Build and deploy in one step |
+
+## GitHub Actions CI/CD
+
+Here's a complete GitHub Actions workflow for building and deploying the Lambda function:
 
 ```yaml
 # .github/workflows/deploy.yml
@@ -287,121 +190,121 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
     steps:
-      - uses: actions/checkout@v3
-      
-      - name: Build Lambda package
-        run: ./scripts/build-lambda.sh docker
-        
-      - name: Deploy with Terraform
-        run: |
-          cd terraform
-          terraform init
-          terraform plan
-          terraform apply -auto-approve
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install cargo-lambda
+        run: pip3 install cargo-lambda
+
+      - name: Build Lambda artifact
+        run: cargo lambda build --release --arm64 --output-format zip
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        working-directory: terraform
+        run: terraform init
+
+      - name: Terraform Plan
+        working-directory: terraform
+        run: terraform plan -out=tfplan
+
+      - name: Terraform Apply
+        working-directory: terraform
+        run: terraform apply -auto-approve tfplan
 ```
 
-### AWS CodePipeline Integration
+> **Note:** Configure AWS credentials in your workflow using `aws-actions/configure-aws-credentials` or your preferred method (OIDC, environment variables, etc.) before the Terraform steps.
 
-1. **Source Stage:** GitHub repository
-2. **Build Stage:** CodeBuild project (using generated `buildspec.yml`)
-3. **Deploy Stage:** CloudFormation or Terraform deployment
+### Adapting for Other CI Systems
+
+The same approach works for any CI system. The key steps are:
+
+1. Install Rust (stable toolchain)
+2. Install cargo-lambda via `pip3 install cargo-lambda`
+3. Run `cargo lambda build --release --arm64 --output-format zip`
+4. Run Terraform to deploy
+
+For example, in **GitLab CI**:
+
+```yaml
+deploy:
+  image: rust:latest
+  script:
+    - pip3 install cargo-lambda
+    - cargo lambda build --release --arm64 --output-format zip
+    - cd terraform && terraform init && terraform apply -auto-approve
+```
 
 ## Troubleshooting
 
-### Common Issues
+### Build Issues
 
-**Docker build fails:**
+**cargo-lambda not found:**
 ```bash
-# Check Docker is running
-docker info
+# Reinstall
+pip3 install cargo-lambda
 
-# Try with verbose output
-./scripts/build-lambda.sh docker --verbose
+# Or check PATH includes pip bin directory
+python3 -m site --user-base  # shows install location
 ```
 
-**Cross-compilation fails:**
-```bash
-# Install Linux target
-rustup target add x86_64-unknown-linux-gnu
+**Build fails with compilation error:**
+This is a Rust source code issue, not a cargo-lambda problem. Read the compiler error and fix the source code. Running `cargo check` gives the same errors faster.
 
-# Clean and retry
-./scripts/build-lambda.sh local --clean
+**Output ZIP not found at expected path:**
+Ensure your `Cargo.toml` has the correct binary name:
+```toml
+[[bin]]
+name = "static-web-lambda"
+```
+The output path uses this name: `target/lambda/<bin-name>/bootstrap.zip`
+
+### Local Development Issues
+
+**Port 9000 already in use:**
+Another process is using the port. Stop it or find what's listening:
+```bash
+lsof -i :9000
 ```
 
-**Package too large:**
-```bash
-# Check binary size
-ls -lh target/x86_64-unknown-linux-gnu/release/static-web-lambda
+**`cargo lambda invoke` connection refused:**
+The watcher must be running first. Start it with `make watch` in another terminal.
 
-# Optimize build
-CARGO_FLAGS="--release" ./scripts/build-lambda.sh docker
+**Hot-reload not triggering:**
+Ensure your edits are in `src/` — cargo-lambda watches the source directory by default.
+
+### Deployment Issues
+
+**Terraform errors on missing file:**
+You must build before deploying. Run `make build-lambda` first, then `make deploy`.
+
+**Lambda function fails at runtime (wrong architecture):**
+Verify you passed `--arm64` during build. The Terraform config expects ARM64 (`architectures = ["arm64"]`).
+
+**Stale deployment (source_code_hash not changing):**
+Run a clean build:
+```bash
+cargo clean
+cargo lambda build --release --arm64 --output-format zip
 ```
 
-**Lambda deployment fails:**
-- Ensure binary is named `bootstrap`
-- Verify executable permissions
-- Check ZIP file structure
-- Confirm Linux target compilation
-
-### Debug Information
-
-Enable verbose output for debugging:
-```bash
-./scripts/build-lambda.sh docker --verbose
-```
-
-This shows:
-- Detailed build commands
-- Docker container execution
-- File operations
-- Package creation steps
-
-## Performance Optimization
-
-### Build Speed
-
-- Use local builds for faster iteration
-- Enable Docker BuildKit for faster Docker builds
-- Use build caches in CI/CD pipelines
-
-### Package Size
-
-- Use release builds (`--release`)
-- Strip debug symbols
-- Consider `musl` target for smaller binaries
-- Optimize dependencies in `Cargo.toml`
-
-### Lambda Performance
-
-- Use `provided.al2` runtime for better cold start performance
-- Optimize binary size for faster deployment
-- Consider provisioned concurrency for consistent performance
-
-## Security Considerations
-
-### Build Security
-
-- Use official Rust Docker images
-- Pin Docker image versions for reproducible builds
-- Validate build artifacts before deployment
-- Use secure CI/CD pipelines
-
-### Deployment Security
-
-- Store deployment packages in secure S3 buckets
-- Use IAM roles with least privilege
-- Enable CloudTrail for deployment auditing
-- Scan deployment packages for vulnerabilities
-
-## Next Steps
-
-After creating your deployment package:
-
-1. **Test locally:** Use the native build for local testing
-2. **Deploy infrastructure:** Use Terraform to create AWS resources
-3. **Deploy function:** Upload the deployment package to Lambda
-4. **Test deployment:** Verify the function works in AWS
-5. **Set up monitoring:** Configure CloudWatch logs and metrics
-
-For infrastructure deployment, see the Terraform configuration in the `terraform/` directory.
+**Lambda returns "Runtime.InvalidEntrypoint":**
+The binary must be named `bootstrap`. cargo-lambda handles this automatically — if you see this error, ensure you're using the ZIP from `target/lambda/static-web-lambda/bootstrap.zip` and not a manually created package.

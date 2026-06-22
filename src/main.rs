@@ -563,6 +563,6 @@ mod tests {
         assert!(html_content.contains("<!DOCTYPE html>"), "Should contain DOCTYPE declaration");
         assert!(html_content.contains("charset=\"UTF-8\""), "Should contain UTF-8 charset");
         assert!(html_content.contains("name=\"viewport\""), "Should contain viewport meta tag");
-        assert!(html_content.contains("🦀 Rust Lambda Function"), "Should contain main heading");
+        assert!(html_content.contains("Serverless Static Web Application"), "Should contain main heading");
     }
 }

@@ -7,7 +7,7 @@ A simple Rust-based webserver that serves a single static HTML page on AWS Lambd
 ### Prerequisites
 
 - **Rust** (1.83 or later) - [Install Rust](https://rustup.rs/)
-- **Docker** (for Lambda builds) - [Install Docker](https://docs.docker.com/get-docker/)
+- **cargo-lambda** (for Lambda builds) - [Install cargo-lambda](https://www.cargo-lambda.info/guide/installation.html)
 - **AWS CLI** (optional, for deployment) - [Install AWS CLI](https://aws.amazon.com/cli/)
 
 ### Environment Setup
@@ -18,10 +18,21 @@ A simple Rust-based webserver that serves a single static HTML page on AWS Lambd
    source ~/.cargo/env
    ```
 
-2. **Install Docker** (required for Lambda builds):
-   - **macOS**: Download Docker Desktop from [docker.com](https://www.docker.com/products/docker-desktop)
-   - **Linux**: Follow [Docker installation guide](https://docs.docker.com/engine/install/)
-   - **Windows**: Download Docker Desktop from [docker.com](https://www.docker.com/products/docker-desktop)
+   > **⚠️ Important (macOS):** Use the official rustup installer above rather than `brew install rust` or `brew install rustup`. The Homebrew Rust formula conflicts with cargo-lambda's cross-compilation toolchain. If you previously had Homebrew's Rust installed, uninstall it first:
+   > ```bash
+   > brew uninstall rust      # if installed
+   > brew uninstall rustup    # if installed
+   > ```
+   > Then install via the official script above.
+
+2. **Install cargo-lambda** (required for Lambda builds):
+   ```bash
+   # Option A: Install via pip (works on all platforms)
+   pip3 install cargo-lambda
+
+   # Option B: Install via Homebrew (macOS/Linux)
+   brew install cargo-lambda
+   ```
 
 3. **Clone and setup**:
    ```bash
@@ -105,7 +116,20 @@ Both modes use the **exact same handler function** to ensure identical behavior:
 
 **Recommended development workflow:**
 
-1. **Develop Locally**:
+1. **Develop Locally** (Option A — cargo lambda watch, recommended):
+   ```bash
+   # Start local Lambda emulator with hot-reload (port 9000)
+   make watch
+   # Or: cargo lambda watch
+   
+   # In another terminal, invoke the function
+   make invoke
+   # Or: cargo lambda invoke static-web-lambda --data-ascii '{"httpMethod": "GET", "path": "/", "requestContext": {"http": {"method": "GET", "path": "/"}}}'
+   ```
+
+   `cargo lambda watch` automatically recompiles on file changes and emulates the Lambda runtime locally, so you can test with realistic Lambda event payloads.
+
+   **Or** (Option B — local HTTP server):
    ```bash
    # Start local server with logging
    RUST_LOG=info ./target/debug/static-web-lambda --mode local --port 3000
@@ -136,10 +160,12 @@ Both modes use the **exact same handler function** to ensure identical behavior:
 
 4. **Deploy to Lambda**:
    ```bash
-   # Build for Lambda
-   cargo build --release --target x86_64-unknown-linux-gnu
+   # Build and deploy in one step
+   make build-deploy
    
-   # Package and deploy (see Deployment section)
+   # Or separately:
+   make build-lambda   # Build ARM64 artifact
+   make deploy         # Deploy via Terraform
    ```
 
 ### 📋 Command-Line Options
@@ -299,100 +325,35 @@ RUST_LOG=info ./target/debug/static-web-lambda --mode local
 
 ## 🏗️ Building for AWS Lambda
 
-This project includes an optimized build system for creating AWS Lambda deployment packages:
+This project uses [cargo-lambda](https://www.cargo-lambda.info/) to build deployment packages for AWS Lambda. No Docker required.
 
-### 🚀 Docker Build (Recommended)
-```bash
-# Optimized Docker build with cached development images
-./scripts/build-lambda.sh docker
-
-# This mode uses Dockerfile.optimized for:
-# - Cached development images (rebuilds only when Dockerfile changes)
-# - Ephemeral build containers (created per build, auto-removed)
-# - Optimized dependency caching (rebuilds only when Cargo.toml changes)
-# - Fast iterative development builds
-```
-
-### 🔄 Alternative Build Methods
-
-#### Local Cross-compilation Build
-```bash
-# Build for x86_64 Lambda using local toolchain
-./scripts/build-lambda.sh local
-```
-
-#### Native Build (Testing Only)
-```bash
-# Native compilation (for testing only - won't work on Lambda)
-./scripts/build-lambda.sh native
-```
-
-### 📊 Build Mode Comparison
-
-| Build Mode | Speed | Use Case | Container Strategy | Optimization |
-|------------|-------|----------|-------------------|--------------|
-| **docker** | 🎯 Optimized | Development & deployment | Cached images + ephemeral containers | Fast rebuilds & layer caching |
-| **local** | 🏠 Fast | Local development | No containers | Cross-compilation |
-| **native** | ⚡ Fastest | Testing only | No containers | Native compilation |
-
-### 🛠️ Build Mode Details
-
-#### Docker Mode (`docker`)
-- **Purpose**: Fast development builds with deployment-ready packages
-- **Strategy**: Cached development images with ephemeral build containers
-- **Benefits**:
-  - Cached development image (reused across builds for speed)
-  - Ephemeral containers (created per build, auto-removed for cleanliness)
-  - Optimized dependency caching (dependencies only rebuild when Cargo.toml changes)
-  - Uses Amazon Linux 2 (same as AWS Lambda runtime)
-  - Fast iterative development with deployment-ready output
-- **Best for**: Both development and production deployments
-
-#### Local Mode (`local`)
-- **Purpose**: Fast local development builds
-- **Strategy**: Cross-compilation using local Rust toolchain
-- **Benefits**:
-  - No Docker required
-  - Fast compilation
-  - Good for development iteration
-- **Best for**: Local development when Docker is not available
-
-### 🔧 Build Script Options
+### Build Command
 
 ```bash
-# Show all available build options
-./scripts/build-lambda.sh --help
+# Build the Lambda deployment artifact (ARM64)
+cargo lambda build --release --arm64 --output-format zip
 
-# Available build methods:
-#   docker          Build using optimized Docker with cached development images (recommended)
-#   local           Build using local cross-compilation toolchain
-#   native          Build using native compilation (for testing only)
-#   codebuild       Generate AWS CodeBuild configuration
-
-# Additional options:
-#   --clean         Clean build artifacts before building
-#   --verbose       Enable verbose output
-#   --validate      Validate build environment
-#   --package-only  Only create deployment package (skip compilation)
+# Or use the Makefile shortcut
+make build-lambda
 ```
 
-### 🚀 Quick Start Examples
+This produces a deployment-ready ZIP at:
+```
+target/lambda/static-web-lambda/bootstrap.zip
+```
+
+The build automatically:
+- Cross-compiles to ARM64 Linux using Zig (bundled with cargo-lambda)
+- Names the binary `bootstrap` (required by Lambda custom runtime)
+- Creates the ZIP deployment package
+- Strips debug symbols for optimal size
+
+### Clean Build
 
 ```bash
-# Recommended for production deployment
-./scripts/build-lambda.sh docker
-
-# For local development (no Docker required)
-./scripts/build-lambda.sh local
-
-# Clean build with verbose output
-./scripts/build-lambda.sh docker --clean --verbose
-
-# Validate build environment
-./scripts/build-lambda.sh --validate
+# Full clean rebuild
+cargo clean && cargo lambda build --release --arm64 --output-format zip
 ```
-
-All build modes create a `lambda-deployment.zip` file ready for AWS Lambda deployment.
 
 ## 📁 Project Structure
 
@@ -409,9 +370,12 @@ static-web-lambda/
 │       ├── unit_tests.rs      # Unit tests
 │       ├── property_tests.rs  # Property-based tests
 │       └── integration_tests.rs # Integration tests
-├── .cargo/config.toml     # Cross-compilation config
+├── terraform/             # Infrastructure as code
+│   ├── lambda.tf          # Lambda function configuration
+│   ├── iam.tf            # IAM roles and policies
+│   └── variables.tf      # Terraform variables
 ├── Cargo.toml            # Dependencies and metadata
-├── Makefile              # Development commands
+├── Makefile              # Development and deployment commands
 └── test_html.sh          # HTML content validation script
 ```
 
@@ -431,25 +395,39 @@ All security features are validated through property-based tests.
 
 ### Common Issues
 
-1. **Docker build errors**:
+1. **cargo-lambda installation issues**:
    ```bash
-   # Ensure Docker is running
-   docker info
+   # If pip install fails, try Homebrew (macOS/Linux)
+   brew install cargo-lambda
    
-   # Try with verbose output
-   ./scripts/build-lambda.sh docker --verbose
+   # Verify installation
+   cargo lambda --version
+   
+   # If "command not found", ensure ~/.cargo/bin is in your PATH
+   export PATH="$HOME/.cargo/bin:$PATH"
    ```
 
-2. **Local cross-compilation errors**:
+2. **Build failures (missing Zig linker)**:
    ```bash
-   # Ensure Linux target is installed
-   rustup target add x86_64-unknown-linux-gnu
+   # cargo-lambda bundles Zig internally, but if you see linker errors:
+   # Reinstall cargo-lambda
+   pip3 install --upgrade cargo-lambda
    
-   # Clean and retry
-   ./scripts/build-lambda.sh local --clean
+   # Or install the binary release directly
+   # See: https://www.cargo-lambda.info/guide/installation.html
    ```
 
-3. **Test failures**:
+3. **Build failures (compilation errors)**:
+   ```bash
+   # Clean build artifacts and retry
+   cargo clean
+   cargo lambda build --release --arm64 --output-format zip
+   
+   # If the binary name doesn't match, check Cargo.toml [[bin]] section
+   # It should have: name = "static-web-lambda"
+   ```
+
+4. **Test failures**:
    ```bash
    # Run tests with detailed output
    cargo test -- --nocapture
@@ -458,23 +436,27 @@ All security features are validated through property-based tests.
    cargo test test_name
    ```
 
-4. **Property test failures**:
+5. **Property test failures**:
    - Check `proptest-regressions/` for saved failing cases
    - Property tests save counterexamples for debugging
    - Run `cargo test` again to verify fixes
 
-### Alternative Build with Docker
+6. **`cargo lambda watch` port conflict**:
+   ```bash
+   # Port 9000 already in use - find and stop the conflicting process
+   lsof -i :9000
+   
+   # Or use a different port (if supported by your cargo-lambda version)
+   ```
 
-The project includes a Docker-based build system that uses Amazon Linux 2 (same as AWS Lambda runtime):
-
-```bash
-# Build Lambda deployment package using Docker
-./scripts/build-lambda.sh docker
-
-# This creates lambda-deployment.zip ready for deployment
-```
-
-This approach is recommended as it ensures complete compatibility with AWS Lambda runtime environment.
+7. **Terraform deployment errors**:
+   ```bash
+   # If terraform complains about missing artifact, build first
+   make build-lambda
+   
+   # Then deploy
+   make deploy
+   ```
 
 ## 📚 Dependencies
 
@@ -494,54 +476,49 @@ This approach is recommended as it ensures complete compatibility with AWS Lambd
 
 ## 🚀 Deployment
 
-The project includes an optimized build script for creating Lambda deployment packages:
+### Deployment Workflow
 
-### 🎯 Recommended Deployment Workflow
-
-1. **Build optimized deployment package**:
+1. **Build the Lambda artifact**:
    ```bash
-   # Create optimized deployment package using multi-stage Docker build
-   ./scripts/build-lambda.sh docker
+   make build-lambda
+   # Runs: cargo lambda build --release --arm64 --output-format zip
+   # Output: target/lambda/static-web-lambda/bootstrap.zip
    ```
 
-2. **Deploy the generated package**:
+2. **Deploy via Terraform**:
    ```bash
-   # The build script creates lambda-deployment.zip
-   # Deploy using AWS CLI, CDK, Terraform, or AWS Console
-   
-   # Example with AWS CLI:
-   aws lambda update-function-code \
-     --function-name your-function-name \
-     --zip-file fileb://lambda-deployment.zip
+   make deploy
+   # Runs: cd terraform && terraform apply
    ```
 
-### 🔄 Alternative Build Methods
+3. **Or build and deploy in one step**:
+   ```bash
+   make build-deploy
+   ```
 
-```bash
-# Local cross-compilation (no Docker required)
-./scripts/build-lambda.sh local
+### Deployment Details
 
-# Native build (testing only)
-./scripts/build-lambda.sh native
-```
+- **Architecture**: ARM64 (Graviton) for better cost-performance
+- **Runtime**: `provided.al2023` (Amazon Linux 2023)
+- **Artifact**: `target/lambda/static-web-lambda/bootstrap.zip`
+- **Infrastructure**: Managed via Terraform in `terraform/` directory
 
-### 🏗️ CI/CD Integration
-
-For automated deployments, use Docker mode in your CI/CD pipeline:
+### CI/CD Integration
 
 ```yaml
-# Example GitHub Actions step
-- name: Build Lambda package
-  run: ./scripts/build-lambda.sh docker
+# Example GitHub Actions workflow
+- name: Install cargo-lambda
+  run: pip3 install cargo-lambda
 
-- name: Deploy to AWS Lambda
+- name: Build Lambda artifact
+  run: cargo lambda build --release --arm64 --output-format zip
+
+- name: Deploy
   run: |
-    aws lambda update-function-code \
-      --function-name ${{ env.LAMBDA_FUNCTION_NAME }} \
-      --zip-file fileb://lambda-deployment.zip
+    cd terraform
+    terraform init
+    terraform apply -auto-approve
 ```
-
-The optimized build system ensures fast development cycles while producing efficient deployment packages with cached development images.
 
 ## 📄 License
 

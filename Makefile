@@ -1,7 +1,7 @@
 # Makefile for Static Web Lambda project
 # This provides convenient commands for development and testing
 
-.PHONY: help build test test-html run clean check build-lambda build-docker build-local deploy-package package-zip docs docs-open
+.PHONY: help build test test-html run clean check build-lambda watch invoke deploy build-deploy docs docs-open
 
 # Default target - show help
 help:
@@ -12,20 +12,20 @@ help:
 	@echo "  make test       - Run all tests"
 	@echo "  make test-html  - Test HTML content specifically"
 	@echo "  make run        - Run the Lambda function locally (will start and stop)"
+	@echo "  make watch      - Run cargo lambda watch for local development (hot-reload)"
+	@echo "  make invoke     - Invoke local Lambda for testing (requires watch running)"
 	@echo "  make check      - Check code without building"
 	@echo "  make clean      - Clean build artifacts"
 	@echo "  make docs       - Generate documentation"
 	@echo "  make docs-open  - Generate and open documentation in browser"
 	@echo ""
 	@echo "Deployment Commands:"
-	@echo "  make build-lambda    - Interactive deployment build menu"
-	@echo "  make build-docker    - Build Lambda package using Docker"
-	@echo "  make build-local     - Build Lambda package using local cross-compilation"
-	@echo "  make deploy-package  - Create deployment package from existing binary"
-	@echo "  make package-zip     - Create ZIP package from bootstrap executable"
+	@echo "  make build-lambda  - Build Lambda artifact with cargo-lambda (ARM64)"
+	@echo "  make deploy        - Deploy via Terraform"
+	@echo "  make build-deploy  - Build Lambda artifact and deploy via Terraform"
 	@echo ""
 	@echo "🧪 After making changes, run: make test-html"
-	@echo "🚀 For deployment, run: make build-lambda"
+	@echo "🚀 For deployment, run: make build-deploy"
 
 # Build the project
 build:
@@ -61,30 +61,24 @@ clean:
 
 # Deployment build commands
 
-# Interactive deployment build menu
+# Build Lambda deployment artifact
 build-lambda:
-	@echo "🚀 Starting interactive deployment build..."
-	@./scripts/build-deploy.sh
+	cargo lambda build --release --arm64 --output-format zip
 
-# Build Lambda package using Docker (recommended)
-build-docker:
-	@echo "🐳 Building Lambda package using Docker..."
-	@./scripts/build-lambda.sh docker
+# Local development with hot-reload
+watch:
+	cargo lambda watch
 
-# Build Lambda package using local cross-compilation
-build-local:
-	@echo "🔧 Building Lambda package using local cross-compilation..."
-	@./scripts/build-lambda.sh local
+# Invoke locally for testing (requires `cargo lambda watch` running in another terminal)
+invoke:
+	cargo lambda invoke static-web-lambda --data-ascii '{"httpMethod": "GET", "path": "/", "requestContext": {"http": {"method": "GET", "path": "/"}}}'
 
-# Create deployment package from existing binary
-deploy-package:
-	@echo "📦 Creating deployment package..."
-	@./scripts/build-lambda.sh --package-only
+# Deploy via Terraform
+deploy:
+	cd terraform && terraform apply
 
-# Create ZIP package from bootstrap executable
-package-zip:
-	@echo "📦 Creating ZIP package from bootstrap executable..."
-	@./scripts/package-lambda.sh
+# Full build and deploy
+build-deploy: build-lambda deploy
 
 docs:
 	@echo "📚 Generating documentation..."
