@@ -1,6 +1,6 @@
 # AWS Lambda Function for Static Web Server
 # This file defines the Lambda function resource that runs the Rust-based static web server
-# The function uses the custom runtime (provided.al2) to run compiled Rust binaries
+# The function uses the custom runtime (provided.al2023) to run compiled Rust binaries
 
 # Lambda Function Resource
 # This creates the actual Lambda function that will serve static HTML content
@@ -10,23 +10,22 @@ resource "aws_lambda_function" "static_web_lambda" {
   description   = "Rust-based static web server serving HTML content via Lambda Function URL"
 
   # Runtime configuration
-  # Using provided.al2 runtime for custom Rust binaries
+  # Using provided.al2023 runtime for custom Rust binaries
   # The binary must be named 'bootstrap' for custom runtimes
-  runtime = "provided.al2"
-  
-  # Handler is not used for custom runtimes (provided.al2)
+  runtime = "provided.al2023"
+
+  # Handler is not used for custom runtimes (provided.al2023)
   # The bootstrap binary serves as the entry point
   handler = "bootstrap"
 
-  # Architecture - using x86_64 for compatibility
-  # arm64 is also supported and may be more cost-effective
-  architectures = ["x86_64"]
+  # Architecture - using arm64 (Graviton) for better price/performance
+  architectures = ["arm64"]
 
   # Deployment package
   # References the ZIP file created by the build script
   # The ZIP must contain a 'bootstrap' executable at the root level
-  filename         = var.deployment_package_path
-  source_code_hash = filebase64sha256(var.deployment_package_path)
+  filename         = "${path.module}/../target/lambda/static-web-lambda/bootstrap.zip"
+  source_code_hash = filebase64sha256("${path.module}/../target/lambda/static-web-lambda/bootstrap.zip")
 
   # Resource allocation
   memory_size = var.lambda_memory  # Memory in MB (also affects CPU allocation)
@@ -40,7 +39,7 @@ resource "aws_lambda_function" "static_web_lambda" {
   # Currently empty as static content doesn't require configuration
   environment {
     variables = {
-      RUST_LOG = "info"  # Set log level for Rust applications
+      RUST_LOG = "info" # Set log level for Rust applications
       # Add other environment variables here if needed
     }
   }
@@ -72,7 +71,7 @@ resource "aws_lambda_function" "static_web_lambda" {
   # Logging configuration
   # Ensures logs go to the CloudWatch log group we created
   logging_config {
-    log_format = "Text"  # Use "JSON" for structured logging
+    log_format = "Text" # Use "JSON" for structured logging
     log_group  = aws_cloudwatch_log_group.lambda_logs.name
   }
 
@@ -82,7 +81,7 @@ resource "aws_lambda_function" "static_web_lambda" {
     Description = "Static web server Lambda function serving HTML content"
     Component   = "compute"
     Environment = var.environment
-    Runtime     = "provided.al2"
+    Runtime     = "provided.al2023"
     Language    = "rust"
   })
 
@@ -101,7 +100,7 @@ resource "aws_lambda_function_url" "static_web_url" {
   count = var.enable_function_url ? 1 : 0
 
   function_name      = aws_lambda_function.static_web_lambda.function_name
-  authorization_type = "NONE"  # Public access for static content
+  authorization_type = "NONE" # Public access for static content
 
   # CORS configuration for browser compatibility
   # Restricts cross-origin requests to enhance security while maintaining functionality
@@ -110,8 +109,8 @@ resource "aws_lambda_function_url" "static_web_url" {
     allow_origins     = var.cors_allowed_origins # Configurable origins - restrict in production for better security
     allow_methods     = ["GET"]                  # Only GET requests for static content (meets requirement 3.4)
     allow_headers     = ["date", "keep-alive", "content-type", "x-amz-date", "authorization", "x-api-key", "x-amz-security-token"]
-    expose_headers    = ["date", "keep-alive"]   # Headers that browsers can access
-    max_age          = var.cors_max_age         # Cache preflight responses to reduce overhead
+    expose_headers    = ["date", "keep-alive"] # Headers that browsers can access
+    max_age           = var.cors_max_age       # Cache preflight responses to reduce overhead
   }
 
   # Note: aws_lambda_function_url resource does not support tags
@@ -123,9 +122,9 @@ resource "aws_lambda_permission" "allow_function_url" {
   count = var.enable_function_url ? 1 : 0
 
   statement_id           = "AllowExecutionFromFunctionURL"
-  action                = "lambda:InvokeFunctionUrl"
-  function_name         = aws_lambda_function.static_web_lambda.function_name
-  principal             = "*"  # Public access for static content
+  action                 = "lambda:InvokeFunctionUrl"
+  function_name          = aws_lambda_function.static_web_lambda.function_name
+  principal              = "*" # Public access for static content
   function_url_auth_type = "NONE"
 }
 
@@ -133,7 +132,7 @@ resource "aws_lambda_permission" "allow_function_url" {
 # This keeps all outputs in one place for better organization
 
 # Lambda Function Configuration Notes:
-# 1. Runtime: provided.al2 for custom Rust binaries
+# 1. Runtime: provided.al2023 for custom Rust binaries
 #    - Requires 'bootstrap' executable in deployment package
 #    - More control over runtime environment
 #    - Better performance for compiled languages
@@ -143,9 +142,8 @@ resource "aws_lambda_permission" "allow_function_url" {
 #    - 30-second timeout provides buffer for cold starts
 #    - Memory affects CPU allocation (more memory = more CPU)
 #
-# 3. Architecture: x86_64 for broad compatibility
-#    - arm64 (Graviton2) may offer better price/performance
-#    - Ensure build process targets correct architecture
+# 3. Architecture: arm64 (Graviton) for better price/performance
+#    - Ensure build process targets correct architecture (cargo-lambda --arm64)
 #
 # 4. Deployment Package:
 #    - Must be ZIP file containing 'bootstrap' executable

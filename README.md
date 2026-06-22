@@ -7,7 +7,7 @@ A simple Rust-based webserver that serves a single static HTML page on AWS Lambd
 ### Prerequisites
 
 - **Rust** (1.83 or later) - [Install Rust](https://rustup.rs/)
-- **Docker** (for Lambda builds) - [Install Docker](https://docs.docker.com/get-docker/)
+- **cargo-lambda** (for Lambda builds) - [Install cargo-lambda](https://www.cargo-lambda.info/guide/installation.html)
 - **AWS CLI** (optional, for deployment) - [Install AWS CLI](https://aws.amazon.com/cli/)
 
 ### Environment Setup
@@ -18,10 +18,21 @@ A simple Rust-based webserver that serves a single static HTML page on AWS Lambd
    source ~/.cargo/env
    ```
 
-2. **Install Docker** (required for Lambda builds):
-   - **macOS**: Download Docker Desktop from [docker.com](https://www.docker.com/products/docker-desktop)
-   - **Linux**: Follow [Docker installation guide](https://docs.docker.com/engine/install/)
-   - **Windows**: Download Docker Desktop from [docker.com](https://www.docker.com/products/docker-desktop)
+   > **⚠️ Important (macOS):** Use the official rustup installer above rather than `brew install rust` or `brew install rustup`. The Homebrew Rust formula conflicts with cargo-lambda's cross-compilation toolchain. If you previously had Homebrew's Rust installed, uninstall it first:
+   > ```bash
+   > brew uninstall rust      # if installed
+   > brew uninstall rustup    # if installed
+   > ```
+   > Then install via the official script above.
+
+2. **Install cargo-lambda** (required for Lambda builds):
+   ```bash
+   # Option A: Install via pip (works on all platforms)
+   pip3 install cargo-lambda
+
+   # Option B: Install via Homebrew (macOS/Linux)
+   brew install cargo-lambda
+   ```
 
 3. **Clone and setup**:
    ```bash

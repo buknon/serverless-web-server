@@ -1,6 +1,0 @@
-# Cargo configuration for local development
-# This file configures build settings for the project
-
-# Build configuration for local development
-[build]
-# Use default target for local development and testing

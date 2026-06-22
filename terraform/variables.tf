@@ -92,7 +92,7 @@ variable "cors_max_age" {
 variable "deployment_package_path" {
   description = "Path to the Lambda deployment package (ZIP file) containing the compiled Rust binary. This should be the output of the build process."
   type        = string
-  default     = "../lambda-deployment.zip"
+  default     = "../target/lambda/static-web-lambda/bootstrap.zip"
 }
 
 variable "tags" {
@@ -102,7 +102,7 @@ variable "tags" {
     Project   = "static-web-lambda"
     ManagedBy = "terraform"
     Language  = "rust"
-    Runtime   = "provided.al2"
+    Runtime   = "provided.al2023"
   }
 }
 
